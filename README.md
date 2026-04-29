@@ -1,6 +1,6 @@
 🚀 Remote CLI Automation Tool
 
-A powerful CLI application that simplifies remote server workflows by combining SSH access, file transfers, and local/remote command execution into configurable, reusable profiles.
+A powerful CLI application that simplifies remote server workflows by combining SSH access, file transfers, and local/remote command execution into configurable, reusable projects.
 
 Built with Go (Golang) and powered by Cobra CLI for a fast, scalable, and maintainable command-line experience.
 
@@ -13,7 +13,7 @@ Private key with passphrase
 📦 Upload files to remote servers (optional)
 🛠 Run local commands before and after remote execution
 📂 Support for running local commands in custom directories
-🧩 Create reusable profiles/projects
+🧩 Create reusable projects
 💾 Persistent configuration using YAML
 🔄 Automate workflows like:
 Build locally → (optional upload) → deploy remotely
@@ -65,7 +65,7 @@ The project follows a clean and scalable structure using Cobra commands:
 
 📁 Configuration
 
-Profiles are stored in YAML format and allow you to define full workflows.
+Projects are stored in YAML format and allow you to define full workflows.
 
 💡 The upload section is optional — if omitted, the workflow will skip file transfer.
 
@@ -73,7 +73,7 @@ Profiles are stored in YAML format and allow you to define full workflows.
 
 
 🧪 Example: Deploy a Node.js App (SSH Key)
-profiles:
+projects:
   node-app:
     ssh:
       host: example.com
@@ -102,7 +102,7 @@ profiles:
         - pm2 restart app
 
 🧪 Example: Deploy using Username & Password
-profiles:
+projects:
   password-app:
     ssh:
       host: example.com
@@ -122,9 +122,11 @@ profiles:
 🚀 Usage
 
 
-Run a profile:
+
+Run a project:
 
 orbit run node-app
+
 
 
 
@@ -134,7 +136,7 @@ orbit list
 orbit run node-app --dry-run
 
 ⚙️ How It Works
-Load profile from YAML
+Load project from YAML
 Execute local "before" commands (in configured working directory)
 Connect to the remote server via SSH
 Upload files (if configured)
@@ -147,13 +149,13 @@ Supported SSH authentication methods:
 Password
 SSH key + passphrase
 SSH config alias (~/.ssh/config)
-🧩 Profile-Based Design
+🧩 Project-Based Design
 
-Each profile represents a project or environment:
+Each project represents an application or environment:
 
 Independent configuration
 Reusable workflows
-Easy switching between servers/projects
+Easy switching between servers/environments
 📌 Roadmap
  Parallel execution across multiple servers
  Environment variables support
