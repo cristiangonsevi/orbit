@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/term"
 
 	"github.com/cristiangonsevi/orbit/internal/config"
@@ -23,18 +24,28 @@ type Client struct {
 // NewClient creates a new SSH client from the given SSH config.
 // It returns the client ready for use, or an error if connection fails.
 func NewClient(cfg *config.SSHConfig) (*Client, error) {
-	sshCfg, err := buildSSHConfig(cfg)
-	if err != nil {
-		return nil, fmt.Errorf("building SSH config: %w", err)
-	}
-
+	// If an alias is used without explicit host, resolve host and IdentityFile
+	// from ~/.ssh/config
+	var resolvedKeyPath string
 	host := cfg.Host
 	if host == "" && cfg.Alias != "" {
-		resolved, err := resolveSSHAlias(cfg.Alias)
+		aliasInfo, err := resolveSSHAlias(cfg.Alias)
 		if err != nil {
 			return nil, fmt.Errorf("resolving SSH alias %q: %w", cfg.Alias, err)
 		}
-		host = resolved
+		host = aliasInfo.hostname
+		resolvedKeyPath = aliasInfo.identityFile
+	}
+
+	// If no explicit key_path but we resolved one from the SSH config, use it
+	sshAuthCfg := *cfg
+	if cfg.Auth.KeyPath == "" && resolvedKeyPath != "" {
+		sshAuthCfg.Auth.KeyPath = resolvedKeyPath
+	}
+
+	sshCfg, err := buildSSHConfig(&sshAuthCfg)
+	if err != nil {
+		return nil, fmt.Errorf("building SSH config: %w", err)
 	}
 
 	addr := net.JoinHostPort(host, "22")
@@ -97,11 +108,11 @@ func buildSSHConfig(cfg *config.SSHConfig) (*ssh.ClientConfig, error) {
 
 	switch cfg.Auth.Type {
 	case "key":
-		auth, err := keyAuth(cfg.Auth.KeyPath, cfg.Auth.Passphrase)
+		auths, err := buildKeyAuths(cfg.Auth.KeyPath, cfg.Auth.Passphrase)
 		if err != nil {
 			return nil, err
 		}
-		sshCfg.Auth = []ssh.AuthMethod{auth}
+		sshCfg.Auth = auths
 
 	case "password":
 		sshCfg.Auth = []ssh.AuthMethod{
@@ -113,6 +124,67 @@ func buildSSHConfig(cfg *config.SSHConfig) (*ssh.ClientConfig, error) {
 	}
 
 	return sshCfg, nil
+}
+
+// buildKeyAuths returns one or more AuthMethods for key-based authentication.
+// If keyPath is empty, it tries the SSH agent first, then falls back to
+// common default key paths.
+func buildKeyAuths(keyPath, passphrase string) ([]ssh.AuthMethod, error) {
+	var auths []ssh.AuthMethod
+
+	// Always try the SSH agent first (if available) — this is the standard
+	// behavior when using `ssh <alias>` from the command line.
+	agentAuth := sshAgentAuth()
+	if agentAuth != nil {
+		auths = append(auths, agentAuth)
+	}
+
+	if keyPath != "" {
+		auth, err := keyAuth(keyPath, passphrase)
+		if err != nil {
+			return nil, err
+		}
+		auths = append(auths, auth)
+	} else {
+		// When no key_path is specified, try common default key locations
+		defaultPaths := []string{
+			filepath.Join(os.Getenv("HOME"), ".ssh", "id_rsa"),
+			filepath.Join(os.Getenv("HOME"), ".ssh", "id_ed25519"),
+			filepath.Join(os.Getenv("HOME"), ".ssh", "id_ecdsa"),
+		}
+		for _, p := range defaultPaths {
+			if _, err := os.Stat(p); err == nil {
+				auth, err := keyAuth(p, passphrase)
+				if err != nil {
+					// If the key is encrypted and passphrase is wrong, skip it
+					// rather than failing — the agent might still work
+					if strings.Contains(err.Error(), "passphrase") {
+						continue
+					}
+					return nil, err
+				}
+				auths = append(auths, auth)
+				break
+			}
+		}
+	}
+
+	if len(auths) == 0 {
+		return nil, fmt.Errorf("no SSH authentication method available: provide a key_path or verify your SSH agent is running")
+	}
+
+	return auths, nil
+}
+
+// sshAgentAuth attempts to connect to the local SSH agent and returns an
+// AuthMethod that delegates to it. Returns nil if the agent is unavailable.
+func sshAgentAuth() ssh.AuthMethod {
+	sshAgentConn, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
+	if err != nil {
+		return nil
+	}
+	sshAgent := agent.NewClient(sshAgentConn)
+	return ssh.PublicKeysCallback(sshAgent.Signers)
 }
 
 // keyAuth creates an ssh.AuthMethod from a private key file path and optional passphrase.
@@ -167,32 +239,47 @@ func tryInteractivePassphrase(keyBytes []byte, keyPath string) (ssh.Signer, erro
 	return ssh.ParsePrivateKeyWithPassphrase(keyBytes, []byte(passphrase))
 }
 
-// resolveSSHAlias attempts to extract the HostName from ~/.ssh/config for a given alias.
+// aliasInfo holds resolved SSH configuration for a given alias.
+type aliasInfo struct {
+	hostname     string
+	identityFile string
+}
+
+// resolveSSHAlias attempts to extract the HostName and IdentityFile from
+// ~/.ssh/config for a given alias.
 // Falls back to using the alias as the hostname if parsing fails.
-func resolveSSHAlias(alias string) (string, error) {
+func resolveSSHAlias(alias string) (*aliasInfo, error) {
 	sshConfigPath := filepath.Join(os.Getenv("HOME"), ".ssh", "config")
+	info := &aliasInfo{hostname: alias}
+
 	if _, err := os.Stat(sshConfigPath); os.IsNotExist(err) {
-		return alias, fmt.Errorf("~/.ssh/config not found, using alias %q as hostname", alias)
+		return info, fmt.Errorf("~/.ssh/config not found, using alias %q as hostname", alias)
 	}
 
 	data, err := os.ReadFile(sshConfigPath)
 	if err != nil {
-		return alias, fmt.Errorf("reading ~/.ssh/config: %w, using alias %q as hostname", err, alias)
+		return info, fmt.Errorf("reading ~/.ssh/config: %w, using alias %q as hostname", err, alias)
 	}
 
-	hostname := findHostNameInSSHConfig(string(data), alias)
-	if hostname == "" {
-		return alias, fmt.Errorf("alias %q not found in ~/.ssh/config, using it as hostname", alias)
+	parsed := parseSSHConfigBlock(string(data), alias)
+	if parsed != nil {
+		if parsed.hostname != "" {
+			info.hostname = parsed.hostname
+		}
+		if parsed.identityFile != "" {
+			info.identityFile = parsed.identityFile
+		}
 	}
 
-	return hostname, nil
+	return info, nil
 }
 
-// findHostNameInSSHConfig parses a simple Host → HostName mapping from SSH config text.
-// This is a simplified parser; it handles the common case.
-func findHostNameInSSHConfig(configText, alias string) string {
+// parseSSHConfigBlock parses a ~/.ssh/config block for the given alias
+// and returns hostname and identityFile if found.
+func parseSSHConfigBlock(configText, alias string) *aliasInfo {
 	lines := strings.Split(configText, "\n")
 	inHost := false
+	result := &aliasInfo{}
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -203,19 +290,26 @@ func findHostNameInSSHConfig(configText, alias string) string {
 		}
 
 		// Check for Host directive
-		if strings.HasPrefix(strings.ToLower(line), "host ") {
+		lower := strings.ToLower(line)
+		if strings.HasPrefix(lower, "host ") {
 			hostPattern := strings.TrimSpace(line[5:])
 			inHost = matchHostPattern(hostPattern, alias)
 			continue
 		}
 
-		// If we're inside the matching Host block, look for HostName
-		if inHost && strings.HasPrefix(strings.ToLower(line), "hostname ") {
-			return strings.TrimSpace(line[9:])
+		if !inHost {
+			continue
+		}
+
+		// Inside the matching Host block, look for HostName and IdentityFile
+		if strings.HasPrefix(lower, "hostname ") {
+			result.hostname = strings.TrimSpace(line[9:])
+		} else if strings.HasPrefix(lower, "identityfile ") {
+			result.identityFile = strings.TrimSpace(line[13:])
 		}
 	}
 
-	return ""
+	return result
 }
 
 // matchHostPattern checks if an SSH config host pattern matches the given alias.
