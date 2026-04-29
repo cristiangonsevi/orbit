@@ -67,57 +67,109 @@ The project follows a clean and scalable structure using Cobra commands:
 
 Projects are stored in YAML format and allow you to define full workflows.
 
-💡 The upload section is optional — if omitted, the workflow will skip file transfer.
+> **Note:** The `upload` section is optional. If omitted, the workflow will skip file transfer and only execute local and remote commands.
+
+💡 Remote commands are executed sequentially in the same shell session, so context is preserved. For example, if you run cd folder and then ls, the ls will be executed inside that folder.
 
 💡 Local commands run in the current working directory by default, but you can override this using working_dir.
 
 
-🧪 Example: Deploy a Node.js App (SSH Key)
+
+🧪 Example: Realistic Deploy of a Node.js App (SSH Key)
 projects:
-  node-app:
+  my-webapp:
     ssh:
-      host: example.com
-      user: root
+      host: 192.168.1.100
+      user: deployer
       auth:
         type: key
         key_path: ~/.ssh/id_rsa
-        passphrase: your-passphrase
+        passphrase: my-secret-passphrase
 
     local:
-      working_dir: ./frontend   # optional, defaults to current directory
+      working_dir: ./webapp
       before:
-        - npm install
+        - echo "Building frontend..."
+        - npm ci
         - npm run build
       after:
-        - echo "Deployment finished"
+        - echo "Local build complete."
 
-    upload: # optional
-      - source: ./frontend/dist
-        destination: /var/www/app
+    upload:
+      - source: ./webapp/dist
+        destination: /srv/www/webapp
 
     remote:
       commands:
-        - cd /var/www/app
-        - npm install --production
-        - pm2 restart app
+        - echo "Switching to app directory..."
+        - cd /srv/www/webapp
+        - echo "Installing dependencies..."
+        - npm ci --omit=dev
+        - echo "Restarting service..."
+        - sudo systemctl restart webapp.service
+
+
+🧪 Example: Deploy using SSH Alias & Passphrase
+
+projects:
+  prod-backend:
+    ssh:
+      alias: backend-prod-alias   # defined in ~/.ssh/config
+      user: produser
+      auth:
+        type: key
+        passphrase: supersecurepass
+
+    local:
+      working_dir: ./backend
+      before:
+        - echo "Running Go build..."
+        - go build -o backend-app .
+      after:
+        - echo "Local build done."
+
+    upload:
+      - source: ./backend/backend-app
+        destination: /opt/backend/backend-app
+
+    remote:
+      commands:
+        - echo "Setting permissions..."
+        - chmod +x /opt/backend/backend-app
+        - echo "Restarting backend service..."
+        - sudo systemctl restart backend.service
+
 
 🧪 Example: Deploy using Username & Password
 projects:
-  password-app:
+  staging-api:
     ssh:
-      host: example.com
-      user: myuser
+      host: staging.example.com
+      user: apiuser
       auth:
         type: password
-        password: mypassword
+        password: mypassword123
 
     local:
+      working_dir: ./api
       before:
-        - echo "Preparando despliegue"
+        - echo "Running tests..."
+        - pytest
+        - echo "Packaging app..."
+        - tar czf api.tar.gz .
+      after:
+        - rm api.tar.gz
+
+    upload:
+      - source: ./api/api.tar.gz
+        destination: /tmp/api.tar.gz
 
     remote:
       commands:
-        - echo "¡Despliegue exitoso!"
+        - echo "Unpacking and deploying API..."
+        - tar xzf /tmp/api.tar.gz -C /srv/api
+        - echo "Restarting API service..."
+        - sudo systemctl restart api.service
 
 🚀 Usage
 
