@@ -1,0 +1,32 @@
+# Orbit project configuration
+# Edit this file to define your deployment workflows.
+#
+# Copy this template or create your own projects below.
+# Run `orbit list` to see all projects.
+# Run `orbit run <project-name>` to execute a project.
+
+projects:
+  my-app:
+    ssh:
+      host: example.com
+      user: deployer
+      auth:
+        type: key
+        key_path: ~/.ssh/id_rsa
+        passphrase: ""
+    local:
+      working_dir: ./app
+      before:
+        - echo "Starting deployment..."
+        - npm ci
+        - npm run build
+      after:
+        - echo "Deployment complete!"
+    upload:
+      - source: ./app/dist
+        destination: /srv/www/app
+    remote:
+      commands:
+        - cd /srv/www/app
+        - npm ci --omit=dev
+        - sudo systemctl restart app.service
