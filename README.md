@@ -1,42 +1,50 @@
-🚀 Remote CLI Automation Tool
+# 🚀 Remote CLI Automation Tool
+
+![Go Version](https://img.shields.io/badge/Go-1.20+-00ADD8?style=flat&logo=go)
+![License](https://img.shields.io/badge/License-MIT-green.svg)
+![CLI](https://img.shields.io/badge/CLI-Cobra-9cf)
+![Status](https://img.shields.io/badge/Status-Active-brightgreen)
 
 A powerful CLI application that simplifies remote server workflows by combining SSH access, file transfers, and local/remote command execution into configurable, reusable projects.
 
-Built with Go (Golang) and powered by Cobra CLI for a fast, scalable, and maintainable command-line experience.
+Built with **Go (Golang)** and powered by **Cobra CLI** for a fast, scalable, and maintainable command-line experience.
 
-✨ Features
-🔐 Connect to remote servers via SSH:
+## ✨ Features
+
+- 🔐 **Connect to remote servers via SSH**:
   - Username & password
   - SSH alias (from SSH config)
   - Private key with passphrase
-⚡ Execute commands remotely
-📦 Upload files to remote servers (optional)
-🛠 Run local commands before and after remote execution
-📂 Support for running local commands in custom directories
-🧩 Create reusable projects
-💾 Persistent configuration using YAML
-🔄 Automate workflows like:
-  Build locally → (optional upload) → deploy remotely
+- ⚡ Execute commands remotely
+- 📦 Upload files to remote servers (optional)
+- 🛠 Run local commands before and after remote execution
+- 📂 Support for running local commands in custom directories
+- 🧩 Create reusable projects
+- 💾 Persistent configuration using YAML
+- 🔄 **Automate workflows** like: Build locally → (optional upload) → deploy remotely
 
-📌 Table of Contents
-- Quick Start
-- Requirements
-- Project Structure
-- Configuration
-- SSH Alias Guide
-- Examples
-- Usage
-- How It Works
-- Authentication Methods
-- Troubleshooting
-- Roadmap
-- Contributing
-- License
+## 📌 Table of Contents
 
-🚀 Quick Start
+- [Quick Start](#quick-start)
+- [Requirements](#requirements)
+- [Project Structure](#project-structure)
+- [Configuration](#configuration)
+- [SSH Alias Guide](#ssh-alias-guide)
+- [Examples](#examples)
+- [Command Reference](#command-reference)
+- [How It Works](#how-it-works)
+- [Security](#security)
+- [Troubleshooting](#troubleshooting)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
 
+---
+
+## 🚀 Quick Start
+
+```bash
 # install
-
 go install github.com/cristiangonsevi/orbit@latest
 
 # ensure Go bin is in PATH
@@ -47,25 +55,36 @@ orbit init
 
 # run your first project
 orbit run my-app
+```
 
-📍 Binary location:
+**📍 Binary location:**
 
+```
 ~/.local/bin/orbit
+```
 
-📍 Config file location:
+**📍 Config file location:**
 
-~/.config/ssh-deployer/config.yaml
+```
+~/.config/orbit/config.yaml
+```
 
-📁 Requirements
+---
+
+## 📁 Requirements
+
 - Go 1.20+ installed
 - SSH access to remote hosts
 - `~/.local/bin` added to your PATH
 - Optional: SSH config with aliases defined in `~/.ssh/config`
 
-📁 Project Structure
+---
+
+## 📁 Project Structure
 
 The project follows a clean and scalable structure using Cobra commands:
 
+```
 .
 ├── cmd/                # CLI commands (Cobra)
 │   ├── root.go
@@ -80,8 +99,13 @@ The project follows a clean and scalable structure using Cobra commands:
 ├── configs/            # Example or default configs
 ├── main.go             # Entry point
 └── README.md
+```
 
-📁 Configuration
+> **Note:** Some directories (e.g., `internal/`, `pkg/`) represent the intended architecture and may be populated incrementally as the project evolves.
+
+---
+
+## 📁 Configuration
 
 Projects are stored in YAML format and allow you to define full workflows.
 
@@ -122,6 +146,7 @@ projects:
 ```
 
 ### Fields
+
 - `projects`: top-level map of project definitions
 - `ssh.host`: remote host or omit when using `ssh.alias`
 - `ssh.alias`: SSH config alias from `~/.ssh/config`
@@ -136,7 +161,9 @@ projects:
 - `upload`: optional array of files/directories to send
 - `remote.commands`: sequential commands executed on the remote host
 
-### SSH Alias Guide
+---
+
+## SSH Alias Guide
 
 If you use an SSH alias, define it in `~/.ssh/config`:
 
@@ -157,6 +184,8 @@ ssh:
     type: key
     passphrase: supersecurepass
 ```
+
+---
 
 ## Examples
 
@@ -270,19 +299,23 @@ projects:
         - sudo systemctl restart api.service
 ```
 
+---
+
 ## Command Reference
 
 ### Available commands
+
 - `orbit init`
 - `orbit list`
 - `orbit run <project-name>`
 - `orbit run <project-name> --dry-run`
-- `orbit help`
-- `orbit version`
+- `orbit --help`
+- `orbit --version`
 
 ### `orbit init`
+
 Initialize a new configuration file and create a starter YAML template.
-- Creates `~/.config/ssh-deployer/config.yaml` by default.
+- Creates `~/.config/orbit/config.yaml` by default.
 - Use this command before running your first project.
 
 ```bash
@@ -290,6 +323,7 @@ orbit init
 ```
 
 ### `orbit list`
+
 Display all available project names defined in the YAML configuration.
 - Helps verify that your config is parsed correctly.
 - Useful to confirm the project name before running.
@@ -299,6 +333,7 @@ orbit list
 ```
 
 ### `orbit run <project-name>`
+
 Execute a project workflow by name.
 - Runs local `before` commands first.
 - Uploads files if the `upload` section exists.
@@ -310,6 +345,7 @@ orbit run my-webapp
 ```
 
 ### `orbit run <project-name> --dry-run`
+
 Validate the project configuration without executing changes.
 - Useful for checking YAML syntax and project structure.
 - Confirms the selected project exists and is loadable.
@@ -319,16 +355,18 @@ orbit run my-webapp --dry-run
 ```
 
 ### `orbit help`
+
 Show usage information for `orbit` or a specific command.
-- Use `orbit help` or `orbit -h` to list commands.
-- Use `orbit help <command>` or `orbit <command> -h` for details about a specific command.
+- Use `orbit -h` or `orbit --help` to list all commands.
+- Use `orbit run -h` or `orbit run --help` for details about a specific command.
 
 ```bash
-orbit help
-orbit help run
+orbit -h
+orbit run --help
 ```
 
 ### `orbit version`
+
 Display the current version of the `orbit` CLI.
 - Also available as `orbit --version`.
 
@@ -338,6 +376,7 @@ orbit --version
 ```
 
 ### Global flags
+
 - `-h`, `--help`: show help for `orbit` or a subcommand
 - `--version`: display the CLI version
 - `--dry-run`: validate the project without executing commands
@@ -345,83 +384,175 @@ orbit --version
 - `--verbose`: enable detailed output for debugging and visibility
 
 ### Shell completion
+
 Enable shell autocompletion to speed up command and flag entry.
 
-Bash:
+**Bash:**
 ```bash
 orbit completion bash > /etc/bash_completion.d/orbit
 ```
 
-Zsh:
+**Zsh:**
 ```bash
 orbit completion zsh > ~/.oh-my-zsh/completions/_orbit
 ```
 
-Fish:
+**Fish:**
 ```bash
 orbit completion fish > ~/.config/fish/completions/orbit.fish
 ```
 
 Reload your shell or source the completion file after installation.
 
-## How It Works
-- Load project from YAML
-- Execute local `before` commands
-- Connect to the remote server via SSH
-- Upload files if configured
-- Execute remote commands sequentially
-- Execute local `after` commands
+---
 
-## Authentication Methods
-Supported SSH authentication methods:
-- Password
-- SSH key + passphrase
-- SSH alias from `~/.ssh/config`
+## How It Works
+
+```mermaid
+flowchart LR
+    A[Load YAML<br/>Configuration] --> B[Execute Local<br/>`before` Commands]
+    B --> C{Upload<br/>Section?}
+    C -->|Yes| D[Upload Files<br/>to Remote Server]
+    C -->|No| E[Execute Remote<br/>Commands Sequentially]
+    D --> E
+    E --> F[Execute Local<br/>`after` Commands]
+    F --> G[Done ✅]
+```
+
+### Workflow summary
+
+1. **Load project** from YAML config file
+2. **Execute** local `before` commands
+3. **Connect** to the remote server via SSH
+4. **Upload** files if the `upload` section is defined
+5. **Execute** remote commands sequentially in the same SSH session (context is preserved across commands)
+6. **Execute** local `after` commands
+
+---
+
+## Security
+
+Since Orbit handles SSH credentials and server access, follow these best practices:
+
+### ⚠️ Secrets in YAML
+
+- **Avoid** hardcoding passwords or passphrases directly in YAML files
+- Especially **never commit** YAML files containing credentials to version control
+- Use `.gitignore` to exclude your config file if it contains secrets
+
+### ✅ Recommended practices
+
+| Practice | Recommendation |
+|---|---|
+| Authentication | Prefer SSH keys over passwords |
+| Passphrases | Use short-lived passphrases or omit them (keys without passphrase are still more secure than passwords) |
+| Environment variables | Consider sourcing credentials from environment variables rather than YAML |
+| File permissions | Run `chmod 600 ~/.config/orbit/config.yaml` to restrict access |
+| SSH config | Use `ssh.alias` to centralize SSH options in `~/.ssh/config` (where you can use `IdentityFile`, `ProxyJump`, etc.) |
+
+### 🔐 SSH key permissions
+
+Ensure your private key file has restricted permissions:
+
+```bash
+chmod 600 ~/.ssh/id_rsa
+chmod 700 ~/.ssh
+```
+
+### 🛡️ Before committing
+
+```bash
+# Check for secrets in your config
+grep -i "password\|passphrase" ~/.config/orbit/config.yaml
+
+# Use `--dry-run` instead of a real run to validate
+orbit run my-app --dry-run
+```
+
+---
 
 ## Troubleshooting
 
 ### Common issues
+
 - `Permission denied`: check SSH key permissions and user access
 - `Host unreachable`: verify network connectivity and host address
 - `Upload failed`: confirm remote destination permissions and path
 - `Command failed`: remote commands run sequentially, so an earlier failure stops the workflow
 
 ### Tips
+
 - Use `orbit run <project-name> --dry-run` to validate config before deployment
 - Keep passwords out of YAML when possible; prefer SSH keys or environment-based secrets
 - Ensure your SSH alias works with `ssh backend-prod-alias` before using it in the project
+- Use `orbit run <project-name> --verbose` for detailed debug output
+
+---
 
 ## Frequently Asked Questions
 
 ### Can I use multiple projects in the same config file?
+
 Yes. Define multiple `projects` keys under the top-level `projects` map, then run each one with `orbit run <project-name>`.
 
 ### Is the `upload` section required?
+
 No. The `upload` section is optional. If omitted, Orbit skips file transfer and runs only the local and remote commands.
 
 ### How are remote commands executed?
+
 Remote commands run sequentially in the same SSH session, so the context is preserved. For example, `cd /app` followed by `ls` executes `ls` inside `/app`.
 
 ### Can I use an SSH config alias?
+
 Yes. Use `ssh.alias` in your project definition and omit `host` and `key_path` if they are already defined in `~/.ssh/config`.
 
 ### Should I store passwords in YAML?
+
 It is not recommended. Use SSH keys with passphrase authentication when possible, or manage credentials outside the project YAML.
 
+---
+
 ## Project-Based Design
+
 Each project represents an application or environment:
 - Independent configuration
 - Reusable workflows
 - Easy switching between servers/environments
 
+---
+
 ## Roadmap
-- Parallel execution across multiple servers
-- Environment variables support
-- Secrets management
-- Plugin system
+
+- [ ] Parallel execution across multiple servers
+- [ ] Environment variables support
+- [ ] Secrets management (encrypted config fields or external vault integration)
+- [ ] Plugin system
+- [ ] Built-in rollback on failure
+
+---
 
 ## Contributing
-Contributions are welcome! Feel free to open issues or submit pull requests.
+
+Contributions are welcome! Here's how to get started:
+
+1. **Fork** the repository
+2. **Clone** your fork: `git clone https://github.com/your-username/orbit.git`
+3. **Build** from source: `go build -o orbit .`
+4. **Run tests**: `go test ./...`
+5. **Create a branch**: `git checkout -b feature/my-feature`
+6. **Commit** your changes with clear messages
+7. **Open a pull request**
+
+### Guidelines
+
+- Follow Go's standard formatting (`gofmt` / `go fmt`)
+- Write tests for new functionality
+- Update documentation (README) for user-facing changes
+- Keep pull requests focused on a single concern
+
+---
 
 ## License
+
 MIT License
