@@ -61,6 +61,23 @@ func (c *Client) uploadFile(localPath, remotePath string, mode os.FileMode, verb
 	}
 	fileSize := info.Size()
 
+	// Determine remote filename and path:
+	// If destination looks like a directory (ends with / or is a known dir path),
+	// append the source file's basename to it.
+	sourceFilename := path.Base(localPath)
+	remoteFilename := sourceFilename
+	if strings.HasSuffix(remotePath, "/") {
+		remotePath = path.Join(remotePath, sourceFilename)
+	} else if path.Base(remotePath) != sourceFilename {
+		// Destination doesn't match source filename, so treat as directory
+		// unless it has an extension (suggesting it's a file path)
+		if !strings.Contains(path.Base(remotePath), ".") {
+			remotePath = path.Join(remotePath, sourceFilename)
+		}
+	}
+	// Update remoteFilename to match the actual remote file name
+	remoteFilename = path.Base(remotePath)
+
 	if verbose {
 		fmt.Fprintf(os.Stderr, "[SCP] Uploading %s (%d bytes) → %s\n", localPath, fileSize, remotePath)
 	}
@@ -92,8 +109,6 @@ func (c *Client) uploadFile(localPath, remotePath string, mode os.FileMode, verb
 	}
 
 	// Send file header: C<perms> <size> <filename>\n
-	// Use the remote file's base name
-	remoteFilename := path.Base(remotePath)
 	header := fmt.Sprintf("C%04o %d %s\n", mode.Perm(), fileSize, remoteFilename)
 	if verbose {
 		fmt.Fprintf(os.Stderr, "[SCP] Sending header: %s", header)
