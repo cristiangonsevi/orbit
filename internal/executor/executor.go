@@ -3,7 +3,9 @@ package executor
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/cristiangonsevi/orbit/internal/config"
 	"github.com/cristiangonsevi/orbit/internal/ssh"
@@ -17,6 +19,8 @@ type Executor struct {
 	verbose bool
 	// savedWorkingDir stores the original directory to restore after execution
 	savedWorkingDir string
+	// sshClient holds the active SSH connection for cleanup on interrupt
+	sshClient *ssh.Client
 }
 
 // New creates a new Executor for the given project.
@@ -39,6 +43,39 @@ func (e *Executor) Run() error {
 		e.savedWorkingDir = wd
 	}
 
+	// Set up signal handling for clean shutdown on Ctrl+C
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	// Channel to signal that execution is done
+	doneCh := make(chan struct{}, 1)
+
+	// Start execution in a goroutine so we can listen for signals
+	type execResult struct {
+		err error
+	}
+	resultCh := make(chan execResult, 1)
+
+	go func() {
+		resultCh <- execResult{err: e.execWorkflow()}
+		close(doneCh)
+	}()
+
+	// Wait for either completion or interrupt
+	select {
+	case res := <-resultCh:
+		signal.Stop(sigCh)
+		return res.err
+	case sig := <-sigCh:
+		signal.Stop(sigCh)
+		fmt.Fprintf(os.Stderr, "\n[EXEC] Received %s, shutting down...\n", sig)
+		e.cleanup()
+		return fmt.Errorf("interrupted by %s", sig)
+	}
+}
+
+// execWorkflow executes the actual workflow steps.
+func (e *Executor) execWorkflow() error {
 	// Step 1: Execute local `before` commands
 	if err := e.runBefore(); err != nil {
 		return fmt.Errorf("before commands: %w", err)
@@ -49,11 +86,7 @@ func (e *Executor) Run() error {
 	if err != nil {
 		return fmt.Errorf("SSH connection: %w", err)
 	}
-	defer func() {
-		if closeErr := sshClient.Close(); closeErr != nil && e.verbose {
-			fmt.Fprintf(os.Stderr, "[EXEC] Warning: error closing SSH connection: %v\n", closeErr)
-		}
-	}()
+	e.sshClient = sshClient
 
 	// Step 3: Upload files (if any)
 	if err := e.runUpload(sshClient); err != nil {
@@ -78,6 +111,20 @@ func (e *Executor) Run() error {
 	}
 
 	return nil
+}
+
+// cleanup performs a clean shutdown of the executor.
+func (e *Executor) cleanup() {
+	// Close SSH connection if open
+	if e.sshClient != nil {
+		if err := e.sshClient.Close(); err != nil && e.verbose {
+			fmt.Fprintf(os.Stderr, "[EXEC] Warning: error closing SSH connection: %v\n", err)
+		}
+		e.sshClient = nil
+	}
+
+	// Restore original working directory
+	e.restoreWD()
 }
 
 // DryRun prints what would be executed without actually running anything.
