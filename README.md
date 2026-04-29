@@ -71,7 +71,8 @@ Profiles are stored in YAML format and allow you to define full workflows.
 
 💡 Local commands run in the current working directory by default, but you can override this using working_dir.
 
-🧪 Example: Deploy a Node.js App
+
+🧪 Example: Deploy a Node.js App (SSH Key)
 profiles:
   node-app:
     ssh:
@@ -99,6 +100,24 @@ profiles:
         - cd /var/www/app
         - npm install --production
         - pm2 restart app
+
+🧪 Example: Deploy using Username & Password
+profiles:
+  password-app:
+    ssh:
+      host: example.com
+      user: myuser
+      auth:
+        type: password
+        password: mypassword
+
+    local:
+      before:
+        - echo "Preparando despliegue"
+
+    remote:
+      commands:
+        - echo "¡Despliegue exitoso!"
 
 🚀 Usage
 
