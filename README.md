@@ -6,9 +6,9 @@ Built with Go (Golang) and powered by Cobra CLI for a fast, scalable, and mainta
 
 ✨ Features
 🔐 Connect to remote servers via SSH:
-Username & password
-SSH alias (from SSH config)
-Private key with passphrase
+  - Username & password
+  - SSH alias (from SSH config)
+  - Private key with passphrase
 ⚡ Execute commands remotely
 📦 Upload files to remote servers (optional)
 🛠 Run local commands before and after remote execution
@@ -16,33 +16,51 @@ Private key with passphrase
 🧩 Create reusable projects
 💾 Persistent configuration using YAML
 🔄 Automate workflows like:
-Build locally → (optional upload) → deploy remotely
+  Build locally → (optional upload) → deploy remotely
+
+📌 Table of Contents
+- Quick Start
+- Requirements
+- Project Structure
+- Configuration
+- SSH Alias Guide
+- Examples
+- Usage
+- How It Works
+- Authentication Methods
+- Troubleshooting
+- Roadmap
+- Contributing
+- License
+
 🚀 Quick Start
+
 # install
 
 go install github.com/cristiangonsevi/orbit@latest
 
-# ensure Go bin is in PATH (common setup)
+# ensure Go bin is in PATH
 export PATH="$HOME/.local/bin:$PATH"
-
 
 # initialize config (creates a YAML template)
 orbit init
 
-
-# run your first profile
+# run your first project
 orbit run my-app
-
 
 📍 Binary location:
 
-
 ~/.local/bin/orbit
-
 
 📍 Config file location:
 
 ~/.config/ssh-deployer/config.yaml
+
+📁 Requirements
+- Go 1.20+ installed
+- SSH access to remote hosts
+- `~/.local/bin` added to your PATH
+- Optional: SSH config with aliases defined in `~/.ssh/config`
 
 📁 Project Structure
 
@@ -69,13 +87,104 @@ Projects are stored in YAML format and allow you to define full workflows.
 
 > **Note:** The `upload` section is optional. If omitted, the workflow will skip file transfer and only execute local and remote commands.
 
-💡 Remote commands are executed sequentially in the same shell session, so context is preserved. For example, if you run cd folder and then ls, the ls will be executed inside that folder.
+> **Note:** Remote commands are executed sequentially in the same shell session, so context is preserved. If you run `cd /folder` and then `ls`, the `ls` command runs inside `/folder`.
 
-💡 Local commands run in the current working directory by default, but you can override this using working_dir.
+> **Note:** Local commands run in the current working directory by default. Use `working_dir` to change it.
 
+### YAML structure
 
+```yaml
+projects:
+  project-name:
+    ssh:
+      host: example.com        # required unless using ssh alias
+      user: deployer
+      auth:
+        type: key              # key, password
+        key_path: ~/.ssh/id_rsa
+        passphrase: secret
+        # password: secret      # only for password auth
+    local:
+      working_dir: ./app
+      before:
+        - npm install
+        - npm run build
+      after:
+        - echo "Done"
+    upload:
+      - source: ./app/dist
+        destination: /srv/www/app
+    remote:
+      commands:
+        - cd /srv/www/app
+        - npm ci --omit=dev
+        - sudo systemctl restart app.service
+```
 
-🧪 Example: Realistic Deploy of a Node.js App (SSH Key)
+### Fields
+- `projects`: top-level map of project definitions
+- `ssh.host`: remote host or omit when using `ssh.alias`
+- `ssh.alias`: SSH config alias from `~/.ssh/config`
+- `ssh.user`: remote SSH user
+- `ssh.auth.type`: `key` or `password`
+- `ssh.auth.key_path`: path to private key (only for key auth)
+- `ssh.auth.passphrase`: passphrase for the private key
+- `ssh.auth.password`: password-based SSH auth
+- `local.working_dir`: local directory for `before`/`after` commands
+- `local.before`: commands executed before upload/remote steps
+- `local.after`: commands executed after remote steps
+- `upload`: optional array of files/directories to send
+- `remote.commands`: sequential commands executed on the remote host
+
+### SSH Alias Guide
+
+If you use an SSH alias, define it in `~/.ssh/config`:
+
+```text
+Host backend-prod-alias
+  HostName example.com
+  User produser
+  IdentityFile ~/.ssh/id_ed25519
+```
+
+Then the project can omit `host` and `key_path`:
+
+```yaml
+ssh:
+  alias: backend-prod-alias
+  user: produser
+  auth:
+    type: key
+    passphrase: supersecurepass
+```
+
+## Examples
+
+### Minimal project (no upload)
+
+```yaml
+projects:
+  simple-app:
+    ssh:
+      host: example.com
+      user: deployer
+      auth:
+        type: key
+        key_path: ~/.ssh/id_rsa
+        passphrase: example-passphrase
+    local:
+      before:
+        - echo "Starting deployment"
+    remote:
+      commands:
+        - cd /srv/simple-app
+        - ls
+        - sudo systemctl restart simple-app.service
+```
+
+### Realistic Node.js deploy with upload
+
+```yaml
 projects:
   my-webapp:
     ssh:
@@ -85,7 +194,6 @@ projects:
         type: key
         key_path: ~/.ssh/id_rsa
         passphrase: my-secret-passphrase
-
     local:
       working_dir: ./webapp
       before:
@@ -94,32 +202,29 @@ projects:
         - npm run build
       after:
         - echo "Local build complete."
-
     upload:
       - source: ./webapp/dist
         destination: /srv/www/webapp
-
     remote:
       commands:
-        - echo "Switching to app directory..."
         - cd /srv/www/webapp
         - echo "Installing dependencies..."
         - npm ci --omit=dev
         - echo "Restarting service..."
         - sudo systemctl restart webapp.service
+```
 
+### Deploy using SSH alias and passphrase
 
-🧪 Example: Deploy using SSH Alias & Passphrase
-
+```yaml
 projects:
   prod-backend:
     ssh:
-      alias: backend-prod-alias   # defined in ~/.ssh/config
+      alias: backend-prod-alias
       user: produser
       auth:
         type: key
         passphrase: supersecurepass
-
     local:
       working_dir: ./backend
       before:
@@ -127,20 +232,18 @@ projects:
         - go build -o backend-app .
       after:
         - echo "Local build done."
-
     upload:
       - source: ./backend/backend-app
         destination: /opt/backend/backend-app
-
     remote:
       commands:
-        - echo "Setting permissions..."
         - chmod +x /opt/backend/backend-app
-        - echo "Restarting backend service..."
         - sudo systemctl restart backend.service
+```
 
+### Deploy using username and password
 
-🧪 Example: Deploy using Username & Password
+```yaml
 projects:
   staging-api:
     ssh:
@@ -149,7 +252,6 @@ projects:
       auth:
         type: password
         password: mypassword123
-
     local:
       working_dir: ./api
       before:
@@ -159,64 +261,70 @@ projects:
         - tar czf api.tar.gz .
       after:
         - rm api.tar.gz
-
     upload:
       - source: ./api/api.tar.gz
         destination: /tmp/api.tar.gz
-
     remote:
       commands:
-        - echo "Unpacking and deploying API..."
         - tar xzf /tmp/api.tar.gz -C /srv/api
-        - echo "Restarting API service..."
         - sudo systemctl restart api.service
+```
 
-🚀 Usage
+## Usage
 
-
-
-Run a project:
-
-orbit run node-app
-
-
-
-
-Other examples:
-
+```bash
+orbit init
 orbit list
-orbit run node-app --dry-run
+orbit run <project-name>
+orbit run <project-name> --dry-run
+```
 
-⚙️ How It Works
-Load project from YAML
-Execute local "before" commands (in configured working directory)
-Connect to the remote server via SSH
-Upload files (if configured)
-Run remote commands
-Execute local "after" commands
-🔒 Authentication Methods
+### Common flags
+- `--dry-run`: validate the project without executing commands
+- `--config <path>`: use a custom config file
+- `--verbose`: enable detailed output
 
+## How It Works
+- Load project from YAML
+- Execute local `before` commands
+- Connect to the remote server via SSH
+- Upload files if configured
+- Execute remote commands sequentially
+- Execute local `after` commands
+
+## Authentication Methods
 Supported SSH authentication methods:
+- Password
+- SSH key + passphrase
+- SSH alias from `~/.ssh/config`
 
-Password
-SSH key + passphrase
-SSH config alias (~/.ssh/config)
-🧩 Project-Based Design
+## Troubleshooting
 
+### Common issues
+- `Permission denied`: check SSH key permissions and user access
+- `Host unreachable`: verify network connectivity and host address
+- `Upload failed`: confirm remote destination permissions and path
+- `Command failed`: remote commands run sequentially, so an earlier failure stops the workflow
+
+### Tips
+- Use `orbit run <project-name> --dry-run` to validate config before deployment
+- Keep passwords out of YAML when possible; prefer SSH keys or environment-based secrets
+- Ensure your SSH alias works with `ssh backend-prod-alias` before using it in the project
+
+## Project-Based Design
 Each project represents an application or environment:
+- Independent configuration
+- Reusable workflows
+- Easy switching between servers/environments
 
-Independent configuration
-Reusable workflows
-Easy switching between servers/environments
-📌 Roadmap
- Parallel execution across multiple servers
- Environment variables support
- Secrets management
- Plugin system
-🤝 Contributing
+## Roadmap
+- Parallel execution across multiple servers
+- Environment variables support
+- Secrets management
+- Plugin system
 
+## Contributing
 Contributions are welcome! Feel free to open issues or submit pull requests.
 
-📄 License
-
+## License
 MIT License
