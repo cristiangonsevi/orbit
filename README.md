@@ -270,19 +270,99 @@ projects:
         - sudo systemctl restart api.service
 ```
 
-## Usage
+## Command Reference
+
+### Available commands
+- `orbit init`
+- `orbit list`
+- `orbit run <project-name>`
+- `orbit run <project-name> --dry-run`
+- `orbit help`
+- `orbit version`
+
+### `orbit init`
+Initialize a new configuration file and create a starter YAML template.
+- Creates `~/.config/ssh-deployer/config.yaml` by default.
+- Use this command before running your first project.
 
 ```bash
 orbit init
-orbit list
-orbit run <project-name>
-orbit run <project-name> --dry-run
 ```
 
-### Common flags
+### `orbit list`
+Display all available project names defined in the YAML configuration.
+- Helps verify that your config is parsed correctly.
+- Useful to confirm the project name before running.
+
+```bash
+orbit list
+```
+
+### `orbit run <project-name>`
+Execute a project workflow by name.
+- Runs local `before` commands first.
+- Uploads files if the `upload` section exists.
+- Executes remote commands sequentially on the target host.
+- Runs local `after` commands last.
+
+```bash
+orbit run my-webapp
+```
+
+### `orbit run <project-name> --dry-run`
+Validate the project configuration without executing changes.
+- Useful for checking YAML syntax and project structure.
+- Confirms the selected project exists and is loadable.
+
+```bash
+orbit run my-webapp --dry-run
+```
+
+### `orbit help`
+Show usage information for `orbit` or a specific command.
+- Use `orbit help` or `orbit -h` to list commands.
+- Use `orbit help <command>` or `orbit <command> -h` for details about a specific command.
+
+```bash
+orbit help
+orbit help run
+```
+
+### `orbit version`
+Display the current version of the `orbit` CLI.
+- Also available as `orbit --version`.
+
+```bash
+orbit version
+orbit --version
+```
+
+### Global flags
+- `-h`, `--help`: show help for `orbit` or a subcommand
+- `--version`: display the CLI version
 - `--dry-run`: validate the project without executing commands
-- `--config <path>`: use a custom config file
-- `--verbose`: enable detailed output
+- `--config <path>`: use a custom config file instead of the default
+- `--verbose`: enable detailed output for debugging and visibility
+
+### Shell completion
+Enable shell autocompletion to speed up command and flag entry.
+
+Bash:
+```bash
+orbit completion bash > /etc/bash_completion.d/orbit
+```
+
+Zsh:
+```bash
+orbit completion zsh > ~/.oh-my-zsh/completions/_orbit
+```
+
+Fish:
+```bash
+orbit completion fish > ~/.config/fish/completions/orbit.fish
+```
+
+Reload your shell or source the completion file after installation.
 
 ## How It Works
 - Load project from YAML
@@ -310,6 +390,23 @@ Supported SSH authentication methods:
 - Use `orbit run <project-name> --dry-run` to validate config before deployment
 - Keep passwords out of YAML when possible; prefer SSH keys or environment-based secrets
 - Ensure your SSH alias works with `ssh backend-prod-alias` before using it in the project
+
+## Frequently Asked Questions
+
+### Can I use multiple projects in the same config file?
+Yes. Define multiple `projects` keys under the top-level `projects` map, then run each one with `orbit run <project-name>`.
+
+### Is the `upload` section required?
+No. The `upload` section is optional. If omitted, Orbit skips file transfer and runs only the local and remote commands.
+
+### How are remote commands executed?
+Remote commands run sequentially in the same SSH session, so the context is preserved. For example, `cd /app` followed by `ls` executes `ls` inside `/app`.
+
+### Can I use an SSH config alias?
+Yes. Use `ssh.alias` in your project definition and omit `host` and `key_path` if they are already defined in `~/.ssh/config`.
+
+### Should I store passwords in YAML?
+It is not recommended. Use SSH keys with passphrase authentication when possible, or manage credentials outside the project YAML.
 
 ## Project-Based Design
 Each project represents an application or environment:
