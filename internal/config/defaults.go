@@ -7,7 +7,7 @@ import (
 
 const (
 	// DefaultConfigDirName is the config directory name under the user's config home.
-	DefaultConfigDirName = "orbit"
+	DefaultConfigDirName = ".orbit"
 	// DefaultConfigFileName is the default YAML config file name.
 	DefaultConfigFileName = "config.yaml"
 	// DefaultConfigDirEnv is the env var for the XDG config home directory.

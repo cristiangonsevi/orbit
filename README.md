@@ -1,11 +1,11 @@
-# 🚀 Remote CLI Automation Tool
+# 🚀 Orbit
 
 ![Go Version](https://img.shields.io/badge/Go-1.20+-00ADD8?style=flat&logo=go)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 ![CLI](https://img.shields.io/badge/CLI-Cobra-9cf)
 ![Status](https://img.shields.io/badge/Status-Active-brightgreen)
 
-A powerful CLI application that simplifies remote server workflows by combining SSH access, file transfers, and local/remote command execution into configurable, reusable projects.
+Orbit is a CLI application that simplifies remote server workflows by combining SSH access, file transfers, and local/remote command execution into configurable, reusable projects.
 
 Built with **Go (Golang)** and powered by **Cobra CLI** for a fast, scalable, and maintainable command-line experience.
 
@@ -41,11 +41,14 @@ Built with **Go (Golang)** and powered by **Cobra CLI** for a fast, scalable, an
 
 ---
 
-## 🚀 Quick Start
+## ⚡ Quick Start
 
 ```bash
-# install
+# install from source
 go install github.com/cristiangonsevi/orbit@latest
+
+# or install from a release script
+curl -fsSL https://raw.githubusercontent.com/cristiangonsevi/orbit/main/scripts/install.sh | sh
 
 # ensure Go bin is in PATH
 export PATH="$HOME/.local/bin:$PATH"
@@ -73,7 +76,7 @@ orbit run my-app
 
 ## 📁 Requirements
 
-- Go 1.20+ installed
+- Go 1.25+ installed
 - SSH access to remote hosts
 - `~/.local/bin` added to your PATH
 - Optional: SSH config with aliases defined in `~/.ssh/config`
@@ -95,6 +98,7 @@ The project follows a clean and scalable structure using Cobra commands:
 │   ├── config/         # YAML parsing & persistence
 │   ├── executor/       # Workflow orchestration
 │   └── uploader/       # File transfer logic
+├── scripts/            # Build and install helpers
 ├── pkg/                # Reusable public packages (optional)
 ├── configs/            # Example or default configs
 ├── main.go             # Entry point
@@ -102,6 +106,28 @@ The project follows a clean and scalable structure using Cobra commands:
 ```
 
 > **Note:** Some directories (e.g., `internal/`, `pkg/`) represent the intended architecture and may be populated incrementally as the project evolves.
+
+---
+
+## 📦 Build and Install
+
+Orbit includes helper scripts similar to the PortBridge project:
+
+```bash
+# build release artifacts for linux/darwin amd64/arm64
+./scripts/build_all.sh
+
+# build a single target
+GOOS=linux GOARCH=amd64 ./scripts/build_all.sh
+
+# install the latest GitHub release into /usr/local/bin
+./scripts/install.sh
+
+# install into a custom prefix
+./scripts/install.sh --prefix ~/.local/bin
+```
+
+The build script produces release-style binaries and `.tar.gz` archives in `build/`. The install script downloads the matching archive for your platform and falls back to the direct binary when needed.
 
 ---
 
@@ -160,6 +186,12 @@ projects:
 - `local.after`: commands executed after remote steps
 - `upload`: optional array of files/directories to send
 - `remote.commands`: sequential commands executed on the remote host
+
+The default configuration lives at:
+
+```bash
+~/.config/orbit/config.yaml
+```
 
 ---
 
@@ -309,6 +341,7 @@ projects:
 - `orbit list`
 - `orbit run <project-name>`
 - `orbit run <project-name> --dry-run`
+- `orbit version`
 - `orbit --help`
 - `orbit --version`
 
@@ -317,6 +350,30 @@ projects:
 Initialize a new configuration file and create a starter YAML template.
 - Creates `~/.config/orbit/config.yaml` by default.
 - Use this command before running your first project.
+
+### `orbit list`
+
+Lists all project names defined in the config file and shows the remote user/host for each one.
+
+### `orbit run <project-name>`
+
+Runs the project workflow in order: local before commands, remote connection, uploads, remote commands, and local after commands.
+
+### `orbit version`
+
+Prints the current CLI version.
+
+---
+
+## 🛠️ Release Flow
+
+When you create a release, build the artifacts first and attach the generated archives to GitHub Releases:
+
+```bash
+VERSION=v0.2.0 ./scripts/build_all.sh --clean
+```
+
+Then publish the matching `orbit-<os>-<arch>.tar.gz` files as release assets so `scripts/install.sh` can download them for users.
 
 ```bash
 orbit init
