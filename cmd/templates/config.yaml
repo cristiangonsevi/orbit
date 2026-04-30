@@ -1,0 +1,138 @@
+# Orbit project configuration
+# Edit this file to define your deployment workflows.
+#
+# Run `orbit list` to see all projects.
+# Run `orbit run <project-name>` to execute a project.
+
+projects:
+  # ──────────────────────────────────────────────
+  # Example 1: Node.js deploy with upload (active)
+  # ──────────────────────────────────────────────
+  my-webapp:
+    ssh:
+      host: 192.168.1.100
+      user: deployer
+      auth:
+        type: key
+        key_path: ~/.ssh/id_rsa
+        passphrase: my-secret-passphrase
+    local:
+      working_dir: ./webapp
+      before:
+        - echo "Building frontend..."
+        - npm ci
+        - npm run build
+      after:
+        - echo "Local build complete."
+    upload:
+      - source: ./webapp/dist
+        destination: /srv/www/webapp
+    remote:
+      commands:
+        - cd /srv/www/webapp
+        - echo "Installing dependencies..."
+        - npm ci --omit=dev
+        - echo "Restarting service..."
+        - sudo systemctl restart webapp.service
+
+  # ──────────────────────────────────────────────
+  # Example 2: Minimal project (no upload)
+  # ──────────────────────────────────────────────
+  # simple-app:
+  #   ssh:
+  #     host: example.com
+  #     user: deployer
+  #     auth:
+  #       type: key
+  #       key_path: ~/.ssh/id_rsa
+  #       passphrase: example-passphrase
+  #   local:
+  #     before:
+  #       - echo "Starting deployment"
+  #   remote:
+  #     commands:
+  #       - cd /srv/simple-app
+  #       - ls
+  #       - sudo systemctl restart simple-app.service
+
+  # ──────────────────────────────────────────────
+  # Example 3: Deploy using SSH alias and passphrase
+  # ──────────────────────────────────────────────
+  # prod-backend:
+  #   ssh:
+  #     alias: backend-prod-alias
+  #     user: produser
+  #     auth:
+  #       type: key
+  #       passphrase: supersecurepass
+  #   local:
+  #     working_dir: ./backend
+  #     before:
+  #       - echo "Running Go build..."
+  #       - go build -o backend-app .
+  #     after:
+  #       - echo "Local build done."
+  #   upload:
+  #     - source: ./backend/backend-app
+  #       destination: /opt/backend/backend-app
+  #   remote:
+  #     commands:
+  #       - chmod +x /opt/backend/backend-app
+  #       - sudo systemctl restart backend.service
+
+  # ──────────────────────────────────────────────
+  # Example 4: Astro static site deploy with zip
+  # ──────────────────────────────────────────────
+  # crisego:
+  #   ssh:
+  #     alias: my-server-alias
+  #     user: deploy
+  #     auth:
+  #       type: key
+  #       passphrase: my-passphrase
+  #   local:
+  #     working_dir: ~/PROJECTS/astro/my-site
+  #     before:
+  #       - echo "Building frontend..."
+  #       - npm ci
+  #       - npm run build
+  #       - echo "Build complete, zipping files..."
+  #       - cd dist && zip -r ../site.zip .
+  #     after:
+  #       - echo "Local build complete."
+  #   upload:
+  #     - source: ~/PROJECTS/astro/my-site/site.zip
+  #       destination: /var/www/my-site
+  #   remote:
+  #     commands:
+  #       - cd /var/www/my-site
+  #       - unzip -o site.zip
+  #       - rm site.zip
+  #       - echo "Deployment complete."
+  #
+  # ──────────────────────────────────────────────
+  # Example 5: Deploy using username and password
+  # ──────────────────────────────────────────────
+  # staging-api:
+  #   ssh:
+  #     host: staging.example.com
+  #     user: apiuser
+  #     auth:
+  #       type: password
+  #       password: mypassword123
+  #   local:
+  #     working_dir: ./api
+  #     before:
+  #       - echo "Running tests..."
+  #       - pytest
+  #       - echo "Packaging app..."
+  #       - tar czf api.tar.gz .
+  #     after:
+  #       - rm api.tar.gz
+  #   upload:
+  #     - source: ./api/api.tar.gz
+  #       destination: /tmp/api.tar.gz
+  #   remote:
+  #     commands:
+  #       - tar xzf /tmp/api.tar.gz -C /srv/api
+  #       - sudo systemctl restart api.service
