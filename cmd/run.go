@@ -26,6 +26,7 @@ The workflow consists of:
 Use the --dry-run flag to see what would be executed without
 actually running any commands.`,
 	Args: cobra.ExactArgs(1),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		projectName := args[0]
 

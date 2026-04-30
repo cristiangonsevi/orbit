@@ -28,12 +28,22 @@ into configurable, reusable projects.
 Complete documentation is available at:
   https://github.com/cristiangonsevi/orbit`,
 	Version: Version,
+	SilenceErrors: true,
+}
+
+const (
+	ansiRed   = "\033[31m"
+	ansiReset = "\033[0m"
+)
+
+func printError(err error) {
+	fmt.Fprintln(os.Stderr, ansiRed+err.Error()+ansiReset)
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		printError(err)
 		os.Exit(1)
 	}
 }
