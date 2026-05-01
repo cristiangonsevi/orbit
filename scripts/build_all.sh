@@ -16,8 +16,9 @@ APP_NAME="orbit"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUTPUT_DIR="$PROJECT_ROOT/build"
 VERSION="${VERSION:-dev}"
-LDFLAGS="${LDFLAGS:--s -w -X github.com/cristiangonsevi/orbit/cmd.Version=${VERSION}}"
 CLEAN=false
+
+DEFAULT_LDFLAGS="-s -w -X github.com/cristiangonsevi/orbit/cmd.Version=${VERSION}"
 
 DEFAULT_TARGETS=(
   "linux/amd64"
@@ -31,6 +32,7 @@ usage() {
 Usage: ./scripts/build_all.sh [options]
 
 Options:
+  --version <version>   Set version for the build (e.g., v0.2.0)
   --output-dir <path>   Write build artifacts to <path> (default: ./build)
   --clean               Remove the output directory before building
   --help, -h            Show this help message
@@ -89,9 +91,14 @@ build_target() {
   rm -rf "$staging_dir"
   mkdir -p "$staging_dir"
 
+  local ldflags="$DEFAULT_LDFLAGS"
+  if [[ -n "${LDFLAGS:-}" ]]; then
+    ldflags="$ldflags $LDFLAGS"
+  fi
+
   CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" go build \
     -trimpath \
-    -ldflags="$LDFLAGS" \
+    -ldflags="$ldflags" \
     -o "$staging_dir/$staged_binary_name" \
     .
 
@@ -113,6 +120,10 @@ while [[ $# -gt 0 ]]; do
       CLEAN=true
       shift
       ;;
+    --version)
+      VERSION="$2"
+      shift 2
+      ;;
     --help|-h)
       usage
       exit 0
@@ -122,6 +133,9 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+# Recalculate DEFAULT_LDFLAGS with the final VERSION value
+DEFAULT_LDFLAGS="-s -w -X github.com/cristiangonsevi/orbit/cmd.Version=${VERSION}"
 
 parse_targets
 
