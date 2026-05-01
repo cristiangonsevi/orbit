@@ -9,14 +9,37 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// getProjectNames returns all project names from the config file (reused from run.go)
+func getProjectNamesFromConfig() ([]string, error) {
+	cfg, err := config.LoadConfig(configFile)
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(cfg.Projects))
+	for name := range cfg.Projects {
+		names = append(names, name)
+	}
+	return names, nil
+}
+
 // listCmd represents the `orbit list` command
 var listCmd = &cobra.Command{
-	Use:   "list",
+	Use:   "list [project-name]",
 	Short: "List all available projects",
 	Long: `Display all project names defined in the YAML configuration.
 
 Useful for verifying your configuration is valid and seeing
 available projects before running them.`,
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		names, err := getProjectNamesFromConfig()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return names, cobra.ShellCompDirectiveNoFileComp
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ui.SetQuietMode(quiet)
 		ui.Header("Available Projects")

@@ -11,6 +11,11 @@ import (
 
 var dryRun bool
 
+// getProjectNames returns all project names from the config file
+func getProjectNames() ([]string, error) {
+	return getProjectNamesFromConfig()
+}
+
 // runCmd represents the `orbit run` command
 var runCmd = &cobra.Command{
 	Use:   "run <project-name>",
@@ -27,6 +32,16 @@ The workflow consists of:
 Use the --dry-run flag to see what would be executed without
 actually running any commands.`,
 	Args:         cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		names, err := getProjectNames()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return names, cobra.ShellCompDirectiveNoFileComp
+	},
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ui.SetQuietMode(quiet)
