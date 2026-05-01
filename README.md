@@ -1,7 +1,7 @@
 # 🚀 Orbit
 
 ![Go Version](https://img.shields.io/badge/Go-1.20+-00ADD8?style=flat&logo=go)
-![License](https://img.shields.io/badge/License-MIT-green.svg)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 ![CLI](https://img.shields.io/badge/CLI-Cobra-9cf)
 ![Status](https://img.shields.io/badge/Status-Active-brightgreen)
 
