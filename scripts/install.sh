@@ -136,9 +136,8 @@ resolve_release_tag() {
     return
   fi
 
-  info "Resolving latest release for $REPO_OWNER/$REPO_NAME"
   local latest_tag
-  latest_tag="$(resolve_latest_tag)"
+  latest_tag="$(resolve_latest_tag 2>/dev/null)"
 
   if [[ -z "$latest_tag" ]]; then
     fail "Could not determine the latest release tag."
