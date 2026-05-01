@@ -19,7 +19,7 @@ REPO_NAME="${REPO_NAME:-orbit}"
 GITHUB_API="https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases"
 GITHUB_DL="https://github.com/$REPO_OWNER/$REPO_NAME/releases/download"
 
-INSTALL_PREFIX="/usr/local/bin"
+INSTALL_PREFIX="${HOME}/.local/bin"
 VERSION="latest"
 DRY_RUN=false
 
@@ -34,7 +34,7 @@ usage() {
 Usage: $0 [options]
 
 Options:
-  --prefix <path>   Install the binary into <path> (default: /usr/local/bin)
+  --prefix <path>   Install the binary into <path> (default: ~/.local/bin)
   --version <tag>   Install a specific release tag (default: latest)
   --dry-run         Show the resolved download/install steps without changing the system
   --help, -h        Show this help message
@@ -267,7 +267,7 @@ else
   if [[ ! -d "$INSTALL_PREFIX" ]]; then
     warn "Directory $INSTALL_PREFIX does not exist. Creating it..."
     if ! mkdir -p "$INSTALL_PREFIX"; then
-      fail "Cannot create $INSTALL_PREFIX. Try using sudo or a different prefix."
+      fail "Cannot create $INSTALL_PREFIX. Use --prefix with a writable directory."
       exit 1
     fi
   fi
@@ -276,7 +276,7 @@ else
     chmod +x "$INSTALL_PREFIX/$APP_NAME"
     ok "Installed to: $INSTALL_PREFIX/$APP_NAME"
   else
-    fail "Failed to install to $INSTALL_PREFIX/$APP_NAME. Try using sudo."
+    fail "Failed to install to $INSTALL_PREFIX/$APP_NAME. Use --prefix with a writable directory."
     exit 1
   fi
 
