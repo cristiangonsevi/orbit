@@ -4,23 +4,21 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"github.com/cristiangonsevi/orbit/internal/config"
 	"github.com/cristiangonsevi/orbit/internal/ssh"
+	"github.com/cristiangonsevi/orbit/internal/ui"
 	"github.com/cristiangonsevi/orbit/internal/uploader"
 )
 
 // Executor coordinates the full project workflow:
 // local before → ssh upload → remote commands → local after.
 type Executor struct {
-	project *config.Project
-	verbose bool
-	// savedWorkingDir stores the original directory to restore after execution
+	project         *config.Project
+	verbose         bool
 	savedWorkingDir string
-	// sshClient holds the active SSH connection for cleanup on interrupt
-	sshClient *ssh.Client
+	sshClient       *ssh.Client
 }
 
 // New creates a new Executor for the given project.
@@ -33,24 +31,16 @@ func New(project *config.Project, verbose bool) *Executor {
 
 // Run executes the full project workflow and returns any error.
 func (e *Executor) Run() error {
-	if e.verbose {
-		fmt.Fprintf(os.Stderr, "[EXEC] Starting workflow for project\n")
-	}
-
-	// Save current working directory to restore later
 	wd, err := os.Getwd()
 	if err == nil {
 		e.savedWorkingDir = wd
 	}
 
-	// Set up signal handling for clean shutdown on Ctrl+C
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
-	// Channel to signal that execution is done
 	doneCh := make(chan struct{}, 1)
 
-	// Start execution in a goroutine so we can listen for signals
 	type execResult struct {
 		err error
 	}
@@ -61,14 +51,13 @@ func (e *Executor) Run() error {
 		close(doneCh)
 	}()
 
-	// Wait for either completion or interrupt
 	select {
 	case res := <-resultCh:
 		signal.Stop(sigCh)
 		return res.err
 	case sig := <-sigCh:
 		signal.Stop(sigCh)
-		fmt.Fprintf(os.Stderr, "\n[EXEC] Received %s, shutting down...\n", sig)
+		ui.Error(fmt.Sprintf("Interrupted by %s", sig))
 		e.cleanup()
 		return fmt.Errorf("interrupted by %s", sig)
 	}
@@ -77,45 +66,78 @@ func (e *Executor) Run() error {
 // execWorkflow executes the actual workflow steps.
 func (e *Executor) execWorkflow() error {
 	// Step 1: Execute local `before` commands
+	ui.Step(1, 5, "Running local before commands")
+	spinner := ui.NewSpinner("Executing...")
+	spinner.Start()
+
 	if err := e.runBefore(); err != nil {
+		spinner.StopWithError("Failed")
 		return fmt.Errorf("before commands: %w", err)
 	}
+	spinner.StopWithSuccess("Done")
+	ui.Separator()
 
 	// Step 2: Connect to SSH
+	ui.Step(2, 5, "Connecting via SSH")
+	spinner = ui.NewSpinner(fmt.Sprintf("Connecting to %s...", e.project.SSH.Host))
+	spinner.Start()
+
 	sshClient, err := ssh.NewClient(e.project.SSH)
 	if err != nil {
+		spinner.StopWithError("Connection failed")
 		return fmt.Errorf("SSH connection: %w", err)
 	}
 	e.sshClient = sshClient
+	spinner.StopWithSuccess("Connected")
+	ui.Separator()
 
 	// Step 3: Upload files (if any)
-	if err := e.runUpload(sshClient); err != nil {
-		return fmt.Errorf("upload: %w", err)
+	if e.project.Upload != nil && len(e.project.Upload) > 0 {
+		ui.Step(3, 5, "Uploading files")
+		spinner = ui.NewSpinner(fmt.Sprintf("Transferring %d file(s)...", len(e.project.Upload)))
+		spinner.Start()
+
+		if err := e.runUpload(sshClient); err != nil {
+			spinner.StopWithError("Upload failed")
+			return fmt.Errorf("upload: %w", err)
+		}
+		spinner.StopWithSuccess("Upload complete")
+		ui.Separator()
+	} else {
+		ui.Step(3, 5, "Skipping uploads (none configured)")
+		ui.Info("No files to upload")
+		ui.Separator()
 	}
 
 	// Step 4: Execute remote commands
+	ui.Step(4, 5, "Executing remote commands")
+	spinner = ui.NewSpinner("Running on remote server...")
+	spinner.Start()
+
 	if err := e.runRemote(sshClient); err != nil {
+		spinner.StopWithError("Remote execution failed")
 		return fmt.Errorf("remote commands: %w", err)
 	}
-
-	// Restore working directory before running local after commands
-	e.restoreWD()
+	spinner.StopWithSuccess("Remote commands completed")
+	ui.Separator()
 
 	// Step 5: Execute local `after` commands
+	e.restoreWD()
+	ui.Step(5, 5, "Running local after commands")
+	spinner = ui.NewSpinner("Executing...")
+	spinner.Start()
+
 	if err := e.runAfter(); err != nil {
+		spinner.StopWithError("Failed")
 		return fmt.Errorf("after commands: %w", err)
 	}
-
-	if e.verbose {
-		fmt.Fprintf(os.Stderr, "[EXEC] Workflow completed successfully\n")
-	}
+	spinner.StopWithSuccess("Done")
 
 	return nil
 }
 
 // cleanup performs a clean shutdown of the executor.
 func (e *Executor) cleanup() {
-	// Close SSH connection if open
 	if e.sshClient != nil {
 		if err := e.sshClient.Close(); err != nil && e.verbose {
 			fmt.Fprintf(os.Stderr, "[EXEC] Warning: error closing SSH connection: %v\n", err)
@@ -123,60 +145,81 @@ func (e *Executor) cleanup() {
 		e.sshClient = nil
 	}
 
-	// Restore original working directory
 	e.restoreWD()
 }
 
 // DryRun prints what would be executed without actually running anything.
 func (e *Executor) DryRun() {
-	fmt.Println("[DRY-RUN] Project workflow plan:")
-	fmt.Println(strings.Repeat("=", 60))
+	ui.Header("Dry Run: Workflow Plan")
 
 	// Local before
-	fmt.Println("\n📋 Step 1: Local before commands")
-	dryRunLocalCommands(e.project.Local.Before, e.project.Local.WorkingDir)
+	ui.SubHeader("Step 1: Local before commands")
+	if e.project.Local == nil || len(e.project.Local.Before) == 0 {
+		ui.Info("No before commands")
+	} else {
+		if e.project.Local.WorkingDir != "" {
+			fmt.Printf("  Working dir: %s\n", ui.ColorCyan(e.project.Local.WorkingDir))
+		}
+		for i, cmd := range e.project.Local.Before {
+			fmt.Printf("  %d. %s\n", i+1, ui.ColorDim(cmd))
+		}
+	}
+	fmt.Println()
 
 	// SSH connection
-	fmt.Println("\n📋 Step 2: SSH connection")
-	fmt.Printf("  Host: %s\n", e.project.SSH.Host)
-	if e.project.SSH.Alias != "" {
-		fmt.Printf("  Alias: %s\n", e.project.SSH.Alias)
+	ui.SubHeader("Step 2: SSH connection")
+	host := e.project.SSH.Host
+	if host == "" {
+		host = e.project.SSH.Alias
 	}
-	fmt.Printf("  User: %s\n", e.project.SSH.User)
-	fmt.Printf("  Auth type: %s\n", e.project.SSH.Auth.Type)
+	fmt.Printf("  Host: %s\n", ui.ColorCyan(host))
+	fmt.Printf("  User: %s\n", ui.ColorCyan(e.project.SSH.User))
+	fmt.Printf("  Auth: %s\n", ui.ColorYellow(e.project.SSH.Auth.Type))
+	fmt.Println()
 
 	// Upload
-	uploader.DryRunUploads(e.project.Upload)
+	ui.SubHeader("Step 3: File uploads")
+	if len(e.project.Upload) == 0 {
+		ui.Info("No uploads configured")
+	} else {
+		for i, entry := range e.project.Upload {
+			fmt.Printf("  %d. %s %s %s\n", i+1, ui.ColorDim(entry.Source), ui.ColorCyan("→"), ui.ColorDim(entry.Destination))
+		}
+	}
+	fmt.Println()
 
 	// Remote commands
-	fmt.Println("\n📋 Step 4: Remote commands")
+	ui.SubHeader("Step 4: Remote commands")
 	if e.project.Remote != nil && len(e.project.Remote.Commands) > 0 {
 		for i, cmd := range e.project.Remote.Commands {
-			fmt.Printf("  %d. %s\n", i+1, cmd)
+			fmt.Printf("  %d. %s\n", i+1, ui.ColorDim(cmd))
 		}
 	} else {
-		fmt.Println("  (none)")
+		ui.Warning("No remote commands configured")
 	}
+	fmt.Println()
 
 	// Local after
-	fmt.Println("\n📋 Step 5: Local after commands")
-	dryRunLocalCommands(e.project.Local.After, e.project.Local.WorkingDir)
+	ui.SubHeader("Step 5: Local after commands")
+	if e.project.Local == nil || len(e.project.Local.After) == 0 {
+		ui.Info("No after commands")
+	} else {
+		for i, cmd := range e.project.Local.After {
+			fmt.Printf("  %d. %s\n", i+1, ui.ColorDim(cmd))
+		}
+	}
+	fmt.Println()
 
-	fmt.Println("\n" + strings.Repeat("=", 60))
-	fmt.Println("[DRY-RUN] No changes were made. Run without --dry-run to execute.")
+	ui.Separator()
+	ui.Info("Dry run complete. Run without --dry-run to execute.")
+	ui.Separator()
+	fmt.Println()
 }
 
 // runBefore executes the local `before` commands.
 func (e *Executor) runBefore() error {
 	if e.project.Local == nil || len(e.project.Local.Before) == 0 {
-		if e.verbose {
-			fmt.Fprintf(os.Stderr, "[EXEC] No before commands to execute\n")
-		}
 		return nil
-	}
-
-	if e.verbose {
-		fmt.Fprintf(os.Stderr, "[EXEC] Running %d before command(s)\n", len(e.project.Local.Before))
 	}
 
 	return runLocalCommands(e.project.Local.Before, e.project.Local.WorkingDir, e.verbose)
@@ -185,14 +228,7 @@ func (e *Executor) runBefore() error {
 // runUpload uploads files to the remote server.
 func (e *Executor) runUpload(client *ssh.Client) error {
 	if e.project.Upload == nil || len(e.project.Upload) == 0 {
-		if e.verbose {
-			fmt.Fprintf(os.Stderr, "[EXEC] No uploads configured, skipping\n")
-		}
 		return nil
-	}
-
-	if e.verbose {
-		fmt.Fprintf(os.Stderr, "[EXEC] Uploading %d file(s)/dir(s)\n", len(e.project.Upload))
 	}
 
 	return uploader.UploadFiles(client, e.project.Upload, e.verbose)
@@ -204,24 +240,13 @@ func (e *Executor) runRemote(client *ssh.Client) error {
 		return fmt.Errorf("no remote commands configured")
 	}
 
-	if e.verbose {
-		fmt.Fprintf(os.Stderr, "[EXEC] Executing %d remote command(s)\n", len(e.project.Remote.Commands))
-	}
-
 	return client.RunCommands(e.project.Remote.Commands, e.verbose)
 }
 
 // runAfter executes the local `after` commands.
 func (e *Executor) runAfter() error {
 	if e.project.Local == nil || len(e.project.Local.After) == 0 {
-		if e.verbose {
-			fmt.Fprintf(os.Stderr, "[EXEC] No after commands to execute\n")
-		}
 		return nil
-	}
-
-	if e.verbose {
-		fmt.Fprintf(os.Stderr, "[EXEC] Running %d after command(s)\n", len(e.project.Local.After))
 	}
 
 	return runLocalCommands(e.project.Local.After, e.project.Local.WorkingDir, e.verbose)

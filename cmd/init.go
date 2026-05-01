@@ -3,8 +3,10 @@ package cmd
 import (
 	_ "embed"
 	"fmt"
+	"time"
 
 	"github.com/cristiangonsevi/orbit/internal/config"
+	"github.com/cristiangonsevi/orbit/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -24,19 +26,28 @@ If the file already exists, it will print an error and exit.
 Use --config to specify a custom path, but init always creates
 the default config file for bootstrapping.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if verbose {
-			fmt.Println("Initializing orbit configuration...")
-		}
+		ui.Header("Orbit Init")
+
+		spinner := ui.NewSpinner("Creating configuration...")
+		spinner.Start()
+
+		// Small delay for visual effect
+		time.Sleep(300 * time.Millisecond)
 
 		path, err := config.InitConfig(defaultConfigTemplate)
+		spinner.Stop()
+
 		if err != nil {
-			return fmt.Errorf("init failed: %w", err)
+			ui.Error(fmt.Sprintf("Failed to initialize: %v", err))
+			return err
 		}
 
-		fmt.Printf("Configuration template created at: %s\n", path)
-		fmt.Println("Edit this file to define your projects, then run:")
-		fmt.Println("  orbit list          # list available projects")
-		fmt.Println("  orbit run <name>    # run a project workflow")
+		ui.Success(fmt.Sprintf("Configuration created at: %s", path))
+		fmt.Println()
+		ui.Info("Next steps:")
+		fmt.Printf("  %s\n", ui.ColorBold("orbit list"))
+		fmt.Printf("  %s %s\n", ui.ColorBold("orbit run"), ui.ColorDim("<project-name>"))
+		fmt.Println()
 		return nil
 	},
 }

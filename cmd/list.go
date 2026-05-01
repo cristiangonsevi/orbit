@@ -5,6 +5,7 @@ import (
 	"sort"
 
 	"github.com/cristiangonsevi/orbit/internal/config"
+	"github.com/cristiangonsevi/orbit/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -17,20 +18,27 @@ var listCmd = &cobra.Command{
 Useful for verifying your configuration is valid and seeing
 available projects before running them.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ui.Header("Available Projects")
+
+		spinner := ui.NewSpinner("Loading configuration...")
+		spinner.Start()
+
 		cfg, err := config.LoadConfig(configFile)
+		spinner.Stop()
+
 		if err != nil {
-			return fmt.Errorf("loading config: %w", err)
+			ui.Error(fmt.Sprintf("Failed to load config: %v", err))
+			return err
 		}
 
 		if len(cfg.Projects) == 0 {
-			fmt.Println("No projects found in configuration.")
-			fmt.Println("Edit the config file to define projects:")
-			fmt.Printf("  %s\n", config.DefaultConfigPath())
+			ui.Warning("No projects found in configuration.")
+			fmt.Println()
+			ui.Info("Get started:")
+			fmt.Printf("  %s\n", ui.ColorBold("orbit init"))
+			fmt.Printf("  %s %s\n", ui.ColorBold("orbit run"), ui.ColorDim("<project-name>"))
 			return nil
 		}
-
-		fmt.Println("Available projects:")
-		fmt.Println()
 
 		// Sort project names for consistent output
 		names := make([]string, 0, len(cfg.Projects))
@@ -39,17 +47,22 @@ available projects before running them.`,
 		}
 		sort.Strings(names)
 
+		ui.Success(fmt.Sprintf("Found %d project(s)", len(cfg.Projects)))
+		fmt.Println()
+
 		for _, name := range names {
 			proj := cfg.Projects[name]
 			host := proj.SSH.Host
 			if host == "" {
 				host = proj.SSH.Alias
 			}
-			fmt.Printf("  %s (→ %s@%s)\n", name, proj.SSH.User, host)
+			fmt.Printf("  %s %s\n", ui.ColorBold(name), ui.ColorDim(fmt.Sprintf("(→ %s@%s)", proj.SSH.User, host)))
 		}
 
 		fmt.Println()
-		fmt.Println("Run 'orbit run <project-name>' to execute a project.")
+		ui.Info("Run with:")
+		fmt.Printf("  %s %s\n", ui.ColorBold("orbit run"), ui.ColorDim("<project-name>"))
+		fmt.Println()
 		return nil
 	},
 }

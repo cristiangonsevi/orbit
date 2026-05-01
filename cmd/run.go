@@ -5,6 +5,7 @@ import (
 
 	"github.com/cristiangonsevi/orbit/internal/config"
 	"github.com/cristiangonsevi/orbit/internal/executor"
+	"github.com/cristiangonsevi/orbit/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -25,41 +26,48 @@ The workflow consists of:
 
 Use the --dry-run flag to see what would be executed without
 actually running any commands.`,
-	Args: cobra.ExactArgs(1),
+	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		projectName := args[0]
 
-		if verbose {
-			fmt.Printf("Loading configuration for project %q\n", projectName)
-		}
+		ui.Header(fmt.Sprintf("Running: %s", projectName))
 
 		cfg, err := config.LoadConfig(configFile)
 		if err != nil {
-			return fmt.Errorf("loading config: %w", err)
+			ui.Error(fmt.Sprintf("Failed to load config: %v", err))
+			return err
 		}
 
 		project, exists := cfg.Projects[projectName]
 		if !exists {
-			return fmt.Errorf("project %q not found in configuration", projectName)
+			ui.Error(fmt.Sprintf("Project %q not found in configuration", projectName))
+			ui.Info("Run 'orbit list' to see available projects")
+			return fmt.Errorf("project %q not found", projectName)
 		}
 
 		exec := executor.New(project, verbose)
 
 		if dryRun {
+			ui.SubHeader("Dry Run Mode")
+			ui.Info(fmt.Sprintf("Showing workflow for project: %s", projectName))
+			fmt.Println()
 			exec.DryRun()
 			return nil
 		}
 
-		if verbose {
-			fmt.Printf("Starting project %q\n", projectName)
-		}
-
+		// Run the project with animated feedback
 		if err := exec.Run(); err != nil {
-			return fmt.Errorf("project %q failed: %w", projectName, err)
+			ui.Error(fmt.Sprintf("Project %q failed", projectName))
+			return err
 		}
 
-		fmt.Printf("Project %q completed successfully.\n", projectName)
+		fmt.Println()
+		ui.Separator()
+		ui.Success(fmt.Sprintf("Project %q completed successfully!", projectName))
+		ui.Separator()
+		fmt.Println()
+
 		return nil
 	},
 }
