@@ -29,6 +29,7 @@ actually running any commands.`,
 	Args:         cobra.ExactArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ui.SetQuietMode(quiet)
 		projectName := args[0]
 
 		ui.Header(fmt.Sprintf("Running: %s", projectName))

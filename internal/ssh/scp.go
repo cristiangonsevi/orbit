@@ -17,6 +17,7 @@ const (
 )
 
 // UploadFile copies a local file or directory to a remote destination via SCP over SSH.
+// It validates that the local file exists before attempting upload.
 func (c *Client) UploadFile(entry config.UploadEntry, verbose bool) error {
 	source := entry.Source
 
@@ -27,6 +28,14 @@ func (c *Client) UploadFile(entry config.UploadEntry, verbose bool) error {
 			return fmt.Errorf("getting home directory: %w", err)
 		}
 		source = filepath.Join(home, source[2:])
+	}
+
+	// Validate that the local file/directory exists before attempting upload
+	if _, err := os.Stat(source); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("local file/directory does not exist: %q (source: %s)", source, entry.Source)
+		}
+		return fmt.Errorf("checking local file %q: %w", source, err)
 	}
 
 	info, err := os.Stat(source)

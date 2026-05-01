@@ -6,6 +6,19 @@ import (
 	"time"
 )
 
+// Global quiet mode flag
+var isQuiet bool
+
+// SetQuietMode enables or disables quiet mode
+func SetQuietMode(quiet bool) {
+	isQuiet = quiet
+}
+
+// IsQuiet returns whether quiet mode is enabled
+func IsQuiet() bool {
+	return isQuiet
+}
+
 // Spinner frames for animation
 var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
@@ -26,7 +39,11 @@ func NewSpinner(message string) *Spinner {
 }
 
 // Start begins the spinner animation in a goroutine
+// If quiet mode is enabled, this is a no-op
 func (s *Spinner) Start() {
+	if isQuiet {
+		return
+	}
 	go func() {
 		frame := 0
 		for {
@@ -48,6 +65,12 @@ func (s *Spinner) Start() {
 
 // Stop stops the spinner and optionally shows a success/failure message
 func (s *Spinner) Stop() {
+	if isQuiet {
+		// In quiet mode, just close the channels
+		close(s.stopCh)
+		close(s.doneCh)
+		return
+	}
 	close(s.stopCh)
 	<-s.doneCh
 }
@@ -55,12 +78,18 @@ func (s *Spinner) Stop() {
 // StopWithSuccess shows a success checkmark after stopping
 func (s *Spinner) StopWithSuccess(message string) {
 	s.Stop()
+	if isQuiet {
+		return
+	}
 	fmt.Printf("\r%s %s\n", ColorGreen("✓"), message)
 }
 
 // StopWithError shows an error X after stopping
 func (s *Spinner) StopWithError(message string) {
 	s.Stop()
+	if isQuiet {
+		return
+	}
 	fmt.Printf("\r%s %s\n", ColorRed("✗"), message)
 }
 
@@ -155,7 +184,7 @@ func (p *ProgressBar) SetProgress(current int) {
 
 // Draw renders the progress bar
 func (p *ProgressBar) Draw() {
-	if p.total == 0 {
+	if isQuiet || p.total == 0 {
 		return
 	}
 
@@ -172,17 +201,26 @@ func (p *ProgressBar) Draw() {
 
 // Clear erases the progress bar line
 func (p *ProgressBar) Clear() {
+	if isQuiet {
+		return
+	}
 	fmt.Printf("\r\033[K")
 }
 
 // Done prints completion message
 func (p *ProgressBar) Done(message string) {
 	p.Clear()
+	if isQuiet {
+		return
+	}
 	fmt.Printf("%s %s\n", ColorGreen("✓"), message)
 }
 
-// Header prints a styled header
+// Header prints a styled header (disabled in quiet mode)
 func Header(title string) {
+	if isQuiet {
+		return
+	}
 	fmt.Println()
 	fmt.Println(ColorBold(ColorCyan("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")))
 	fmt.Printf("  %s\n", ColorBold(ColorCyan(title)))
@@ -190,38 +228,60 @@ func Header(title string) {
 	fmt.Println()
 }
 
-// SubHeader prints a styled sub-header
+// SubHeader prints a styled sub-header (disabled in quiet mode)
 func SubHeader(title string) {
+	if isQuiet {
+		return
+	}
 	fmt.Println()
 	fmt.Printf("%s %s\n", ColorBold("▶"), ColorBold(ColorBlue(title)))
 }
 
 // Success prints a success message
 func Success(message string) {
+	if isQuiet {
+		return
+	}
 	fmt.Printf("%s %s\n", ColorGreen("✓"), message)
 }
 
 // Info prints an info message
 func Info(message string) {
+	if isQuiet {
+		return
+	}
 	fmt.Printf("%s %s\n", ColorBlue("●"), message)
 }
 
 // Warning prints a warning message
 func Warning(message string) {
+	if isQuiet {
+		return
+	}
 	fmt.Printf("%s %s\n", ColorYellow("⚠"), message)
 }
 
-// Error prints an error message
+// Error prints an error message (always shown even in quiet mode)
 func Error(message string) {
+	if isQuiet {
+		fmt.Printf("✗ %s\n", ColorRed(message))
+		return
+	}
 	fmt.Printf("%s %s\n", ColorRed("✗"), ColorRed(message))
 }
 
-// Step prints a numbered step
+// Step prints a numbered step (disabled in quiet mode)
 func Step(num int, total int, message string) {
+	if isQuiet {
+		return
+	}
 	fmt.Printf("%s %d/%d %s\n", ColorMagenta("▸"), num, total, ColorBold(message))
 }
 
-// Separator prints a visual separator
+// Separator prints a visual separator (disabled in quiet mode)
 func Separator() {
+	if isQuiet {
+		return
+	}
 	fmt.Println(ColorDim("────────────────────────────────────────────────────────"))
 }

@@ -18,6 +18,7 @@ var listCmd = &cobra.Command{
 Useful for verifying your configuration is valid and seeing
 available projects before running them.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ui.SetQuietMode(quiet)
 		ui.Header("Available Projects")
 
 		spinner := ui.NewSpinner("Loading configuration...")

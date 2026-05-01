@@ -26,6 +26,7 @@ If the file already exists, it will print an error and exit.
 Use --config to specify a custom path, but init always creates
 the default config file for bootstrapping.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		ui.SetQuietMode(quiet)
 		ui.Header("Orbit Init")
 
 		spinner := ui.NewSpinner("Creating configuration...")
