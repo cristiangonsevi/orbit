@@ -113,9 +113,9 @@ resolve_latest_tag() {
   local release_json
 
   if have_tool curl; then
-    release_json=$(curl -fsSL "$GITHUB_API/latest")
+    release_json=$(curl -fsSL "$GITHUB_API/latest" 2>/dev/null)
   else
-    release_json=$(wget -qO- "$GITHUB_API/latest")
+    release_json=$(wget -qO- "$GITHUB_API/latest" 2>/dev/null)
   fi
 
   echo "$release_json" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1
@@ -138,7 +138,7 @@ resolve_release_tag() {
 
   info "Resolving latest release for $REPO_OWNER/$REPO_NAME"
   local latest_tag
-  latest_tag="$(resolve_latest_tag || true)"
+  latest_tag="$(resolve_latest_tag)"
 
   if [[ -z "$latest_tag" ]]; then
     fail "Could not determine the latest release tag."
