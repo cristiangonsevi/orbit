@@ -16,7 +16,7 @@ Built with Go and Cobra.
 
 ```bash
 # Install
-curl -fsSL https://raw.githubusercontent.com/cristiangonsevi/orbit/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cristiangonsevi/orbit/refs/heads/master/scripts/install.sh | bash
 
 # Or build from source
 go install github.com/cristiangonsevi/orbit@latest
@@ -33,7 +33,7 @@ orbit run my-project
 Download a binary for your platform from the releases page, or use the install script:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cristiangonsevi/orbit/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/cristiangonsevi/orbit/refs/heads/master/scripts/install.sh | bash
 ```
 
 The binary installs to `~/.local/bin/orbit` by default.
