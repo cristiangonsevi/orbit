@@ -16,7 +16,7 @@ Built with Go and Cobra.
 
 ```bash
 # Install
-curl -fsSL https://raw.githubusercontent.com/cristiangonsevi/orbit/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/cristiangonsevi/orbit/main/scripts/install.sh | bash
 
 # Or build from source
 go install github.com/cristiangonsevi/orbit@latest
