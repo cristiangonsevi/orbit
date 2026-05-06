@@ -55,6 +55,8 @@ projects:
       before:
         - npm install
         - npm run build
+      after:
+        - npm test
     upload:
       - source: ./dist
         destination: /var/www/app
@@ -63,10 +65,25 @@ projects:
         - cp -r /tmp/dist/* /var/www/app/
 ```
 
+## Configuration Validation
+
+Run `orbit validate` to check your configuration for common issues:
+
+```bash
+orbit validate
+```
+
+This will warn you about:
+- Projects with `before` but no `after` section
+- Empty `local` sections
+
+These warnings don't block execution, but they may indicate misconfigurations.
+
 ## Commands
 
 - `orbit init` — Create a new config file
 - `orbit list` — Show all configured projects
+- `orbit validate` — Validate config and report warnings
 - `orbit run <name>` — Execute a project
 - `orbit run <name> --dry-run` — Preview without executing
 - `orbit version` — Show version

@@ -15,7 +15,7 @@ var (
 	// quiet suppresses animations and progress indicators
 	quiet bool
 	// Version is set at build time via ldflags
-	Version = "0.0.0"
+	Version = "0.0.3"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -37,7 +37,7 @@ Complete documentation is available at:
 		if len(args) != 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return []string{"init", "list", "run", "completion", "version"}, cobra.ShellCompDirectiveNoFileComp
+		return []string{"init", "list", "run", "validate", "completion", "version"}, cobra.ShellCompDirectiveNoFileComp
 	},
 }
 
@@ -58,7 +58,7 @@ _orbit_completion() {
 
     # Main command completion
     if [[ $cword -eq 1 ]]; then
-        COMPREPLY=($(compgen -W "init list run completion version" -- "$cur"))
+        COMPREPLY=($(compgen -W "init list run validate completion version" -- "$cur"))
         return 0
     fi
 

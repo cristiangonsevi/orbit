@@ -9,6 +9,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// showWarnings displays configuration warnings for a project.
+func showWarnings(cfg *config.Config, projectName string) {
+	warnings := cfg.ValidateDeep()
+	if len(warnings) == 0 {
+		return
+	}
+	for _, w := range warnings {
+		if w.Project == projectName {
+			ui.Warning(fmt.Sprintf("Project %q: %s", w.Project, w.Message))
+		}
+	}
+}
+
 var dryRun bool
 
 // getProjectNames returns all project names from the config file
@@ -47,13 +60,13 @@ actually running any commands.`,
 		ui.SetQuietMode(quiet)
 		projectName := args[0]
 
-		ui.Header(fmt.Sprintf("Running: %s", projectName))
-
 		cfg, err := config.LoadConfig(configFile)
 		if err != nil {
 			ui.Error(fmt.Sprintf("Failed to load config: %v", err))
 			return err
 		}
+
+		showWarnings(cfg, projectName)
 
 		project, exists := cfg.Projects[projectName]
 		if !exists {
@@ -62,6 +75,7 @@ actually running any commands.`,
 			return fmt.Errorf("project %q not found", projectName)
 		}
 
+		ui.Header(fmt.Sprintf("Running: %s", projectName))
 		exec := executor.New(project, verbose)
 
 		if dryRun {

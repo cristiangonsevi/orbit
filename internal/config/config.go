@@ -124,6 +124,38 @@ func (p *Project) Validate() error {
 	return nil
 }
 
+// Warning represents a non-fatal configuration issue.
+type Warning struct {
+	Project string
+	Message string
+	Line    int
+}
+
+// ValidateDeep performs deep validation and returns warnings for common issues.
+func (c *Config) ValidateDeep() []Warning {
+	var warnings []Warning
+
+	for name, p := range c.Projects {
+		// Check if project has 'before' but no 'after'
+		if p.Local != nil && len(p.Local.Before) > 0 && len(p.Local.After) == 0 {
+			warnings = append(warnings, Warning{
+				Project: name,
+				Message: "has 'before' but no 'after' section",
+			})
+		}
+
+		// Check if project has 'local' section but it's essentially empty
+		if p.Local != nil && len(p.Local.Before) == 0 && len(p.Local.After) == 0 {
+			warnings = append(warnings, Warning{
+				Project: name,
+				Message: "local section exists but has no before/after commands",
+			})
+		}
+	}
+
+	return warnings
+}
+
 // InitConfig creates a default config file at the default path if it doesn't exist.
 func InitConfig(template string) (string, error) {
 	path := DefaultConfigPath()
