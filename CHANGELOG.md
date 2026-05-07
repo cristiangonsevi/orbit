@@ -9,11 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `orbit validate` - Validate configuration and report warnings
+- `orbit update` - Self-update command to fetch latest version from GitHub
+- `orbit update --check` - Check for updates without installing
+- `orbit update --yes` - Skip confirmation prompt
+- `orbit update --version <ver>` - Install a specific version
 - `ValidateDeep()` method to detect common config issues (missing 'after' sections, empty local sections)
 - Warnings displayed at start of `orbit run` and `orbit run --dry-run`
+- `internal/utils/platform.go` for OS/arch detection
 
 ### Fixed
-- Improved bash completion to include `validate` command
+- Improved bash completion to include `validate` and `update` commands
 
 ## [0.0.2] - 2026-05-01
 

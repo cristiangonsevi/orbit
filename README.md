@@ -38,6 +38,22 @@ curl -fsSL https://raw.githubusercontent.com/cristiangonsevi/orbit/refs/heads/ma
 
 The binary installs to `~/.local/bin/orbit` by default.
 
+## Updating
+
+Update orbit to the latest version:
+
+```bash
+orbit update
+```
+
+Use `--check` to only verify the current version without installing:
+
+```bash
+orbit update --check
+```
+
+Use `--version v0.0.4` to install a specific version.
+
 ## Configuration
 
 Edit `~/.config/.orbit/config.yaml` to define your projects:
@@ -84,6 +100,8 @@ These warnings don't block execution, but they may indicate misconfigurations.
 - `orbit init` — Create a new config file
 - `orbit list` — Show all configured projects
 - `orbit validate` — Validate config and report warnings
+- `orbit update` — Update orbit to the latest version
+- `orbit update --check` — Check for updates without installing
 - `orbit run <name>` — Execute a project
 - `orbit run <name> --dry-run` — Preview without executing
 - `orbit version` — Show version
