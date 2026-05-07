@@ -15,7 +15,7 @@ var (
 	// quiet suppresses animations and progress indicators
 	quiet bool
 	// Version is set at build time via ldflags
-	Version = "0.0.3"
+	Version = "0.0.4"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -29,9 +29,9 @@ into configurable, reusable projects.
 
 Complete documentation is available at:
   https://github.com/cristiangonsevi/orbit`,
-	Version:               Version,
-	SilenceErrors:         true,
-	SilenceUsage:          true,
+	Version:                Version,
+	SilenceErrors:          true,
+	SilenceUsage:           true,
 	BashCompletionFunction: bashCompletionFunction,
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) != 0 {

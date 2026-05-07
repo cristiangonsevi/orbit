@@ -21,6 +21,11 @@ type Client struct {
 	config *config.SSHConfig
 }
 
+const (
+	maxRetries     = 3
+	initialBackoff = 1 * time.Second
+)
+
 // NewClient creates a new SSH client from the given SSH config.
 // It returns the client ready for use, or an error if connection fails.
 func NewClient(cfg *config.SSHConfig) (*Client, error) {
@@ -49,9 +54,9 @@ func NewClient(cfg *config.SSHConfig) (*Client, error) {
 	}
 
 	addr := net.JoinHostPort(host, "22")
-	conn, err := ssh.Dial("tcp", addr, sshCfg)
+	conn, err := dialWithRetry(addr, sshCfg)
 	if err != nil {
-		return nil, fmt.Errorf("dialing SSH %s@%s: %w", cfg.User, addr, err)
+		return nil, fmt.Errorf("dialing SSH %s@%s after %d retries: %w", cfg.User, addr, maxRetries+1, err)
 	}
 
 	return &Client{
@@ -63,6 +68,31 @@ func NewClient(cfg *config.SSHConfig) (*Client, error) {
 // Close terminates the SSH connection.
 func (c *Client) Close() error {
 	return c.client.Close()
+}
+
+// dialWithRetry attempts to establish an SSH connection with exponential backoff.
+func dialWithRetry(addr string, config *ssh.ClientConfig) (*ssh.Client, error) {
+	var lastErr error
+	backoff := initialBackoff
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			fmt.Fprintf(os.Stderr, "[SSH] Connection attempt %d/%d failed, retrying in %v...\n", attempt, maxRetries, backoff)
+		}
+
+		conn, err := ssh.Dial("tcp", addr, config)
+		if err == nil {
+			return conn, nil
+		}
+		lastErr = err
+
+		if attempt < maxRetries {
+			time.Sleep(backoff)
+			backoff *= 2
+		}
+	}
+
+	return nil, lastErr
 }
 
 // RunCommands executes a sequence of commands in a single SSH session.

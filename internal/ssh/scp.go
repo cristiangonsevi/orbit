@@ -16,6 +16,45 @@ const (
 	scpBufferSize = 32 * 1024 // 32KB buffer for SCP transfers
 )
 
+// ProgressCallback is called during file transfer to report progress.
+type ProgressCallback func(sent, total int64, startTime time.Time)
+
+// formatSpeed formats bytes per second into a human-readable string.
+func formatSpeed(bytesPerSec float64) string {
+	switch {
+	case bytesPerSec >= 1<<30:
+		return fmt.Sprintf("%.1f GiB/s", bytesPerSec/(1<<30))
+	case bytesPerSec >= 1<<20:
+		return fmt.Sprintf("%.1f MiB/s", bytesPerSec/(1<<20))
+	case bytesPerSec >= 1<<10:
+		return fmt.Sprintf("%.1f KiB/s", bytesPerSec/(1<<10))
+	default:
+		return fmt.Sprintf("%.0f B/s", bytesPerSec)
+	}
+}
+
+// formatBytes formats a byte count into a human-readable string.
+func formatBytes(bytes int64) string {
+	switch {
+	case bytes >= 1<<30:
+		return fmt.Sprintf("%.1f GiB", float64(bytes)/(1<<30))
+	case bytes >= 1<<20:
+		return fmt.Sprintf("%.1f MiB", float64(bytes)/(1<<20))
+	case bytes >= 1<<10:
+		return fmt.Sprintf("%.1f KiB", float64(bytes)/(1<<10))
+	default:
+		return fmt.Sprintf("%d B", bytes)
+	}
+}
+
+// progressBar creates an ASCII progress bar string.
+func progressBar(sent, total int64) string {
+	const width = 20
+	pos := int(float64(sent) * width / float64(total))
+	bar := strings.Repeat("█", pos) + strings.Repeat("░", width-pos)
+	return bar
+}
+
 // UploadFile copies a local file or directory to a remote destination via SCP over SSH.
 // It validates that the local file exists before attempting upload.
 func (c *Client) UploadFile(entry config.UploadEntry, verbose bool) error {
@@ -43,14 +82,33 @@ func (c *Client) UploadFile(entry config.UploadEntry, verbose bool) error {
 		return fmt.Errorf("stat source %q: %w", source, err)
 	}
 
-	if info.IsDir() {
-		return c.uploadDir(source, entry.Destination, verbose)
+	// Create progress callback for non-verbose mode
+	var progressCB ProgressCallback
+	if !verbose {
+		filename := path.Base(source)
+		progressCB = func(sent, total int64, startTime time.Time) {
+			elapsed := time.Since(startTime)
+			speed := float64(sent) / elapsed.Seconds()
+			percent := float64(sent) * 100 / float64(total)
+			fmt.Fprintf(os.Stderr, "\rUploading %s  %5.1f%% [%s] %s/%s  %s  ",
+				filename,
+				percent,
+				progressBar(sent, total),
+				formatBytes(sent),
+				formatBytes(total),
+				formatSpeed(speed),
+			)
+		}
 	}
-	return c.uploadFile(source, entry.Destination, info.Mode(), verbose)
+
+	if info.IsDir() {
+		return c.uploadDir(source, entry.Destination, verbose, progressCB)
+	}
+	return c.uploadFile(source, entry.Destination, info.Mode(), verbose, progressCB)
 }
 
 // uploadFile copies a single file to the remote host using SCP protocol.
-func (c *Client) uploadFile(localPath, remotePath string, mode os.FileMode, verbose bool) error {
+func (c *Client) uploadFile(localPath, remotePath string, mode os.FileMode, verbose bool, progressCB ProgressCallback) error {
 	session, err := c.client.NewSession()
 	if err != nil {
 		return fmt.Errorf("creating SCP session: %w", err)
@@ -134,6 +192,7 @@ func (c *Client) uploadFile(localPath, remotePath string, mode os.FileMode, verb
 	// Send file contents in chunks
 	buf := make([]byte, scpBufferSize)
 	var sent int64
+	startTime := time.Now()
 	for sent < fileSize {
 		n, err := file.Read(buf)
 		if err != nil && err != io.EOF {
@@ -146,6 +205,9 @@ func (c *Client) uploadFile(localPath, remotePath string, mode os.FileMode, verb
 			return fmt.Errorf("writing file data to SCP stream: %w", err)
 		}
 		sent += int64(n)
+		if progressCB != nil {
+			progressCB(sent, fileSize, startTime)
+		}
 	}
 
 	// Send EOF marker (0x00)
@@ -167,7 +229,7 @@ func (c *Client) uploadFile(localPath, remotePath string, mode os.FileMode, verb
 }
 
 // uploadDir recursively uploads a directory to the remote host.
-func (c *Client) uploadDir(localPath, remotePath string, verbose bool) error {
+func (c *Client) uploadDir(localPath, remotePath string, verbose bool, progressCB ProgressCallback) error {
 	// First create the remote directory
 	session, err := c.client.NewSession()
 	if err != nil {
@@ -191,7 +253,7 @@ func (c *Client) uploadDir(localPath, remotePath string, verbose bool) error {
 		remoteEntryPath := path.Join(remotePath, entry.Name())
 
 		if entry.IsDir() {
-			if err := c.uploadDir(localEntryPath, remoteEntryPath, verbose); err != nil {
+			if err := c.uploadDir(localEntryPath, remoteEntryPath, verbose, progressCB); err != nil {
 				return err
 			}
 		} else {
@@ -199,7 +261,7 @@ func (c *Client) uploadDir(localPath, remotePath string, verbose bool) error {
 			if err != nil {
 				return fmt.Errorf("getting file info for %q: %w", localEntryPath, err)
 			}
-			if err := c.uploadFile(localEntryPath, remoteEntryPath, info.Mode(), verbose); err != nil {
+			if err := c.uploadFile(localEntryPath, remoteEntryPath, info.Mode(), verbose, progressCB); err != nil {
 				return err
 			}
 			// SCP protocol requires a small delay between files in a session

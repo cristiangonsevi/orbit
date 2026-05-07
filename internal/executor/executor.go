@@ -5,8 +5,10 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/cristiangonsevi/orbit/internal/config"
+	"github.com/cristiangonsevi/orbit/internal/logging"
 	"github.com/cristiangonsevi/orbit/internal/ssh"
 	"github.com/cristiangonsevi/orbit/internal/ui"
 	"github.com/cristiangonsevi/orbit/internal/uploader"
@@ -16,16 +18,20 @@ import (
 // local before → ssh upload → remote commands → local after.
 type Executor struct {
 	project         *config.Project
+	projectName     string
 	verbose         bool
 	savedWorkingDir string
 	sshClient       *ssh.Client
+	logger          *logging.Logger
+	startTime       time.Time
 }
 
 // New creates a new Executor for the given project.
-func New(project *config.Project, verbose bool) *Executor {
+func New(project *config.Project, projectName string, verbose bool) *Executor {
 	return &Executor{
-		project: project,
-		verbose: verbose,
+		project:     project,
+		projectName: projectName,
+		verbose:     verbose,
 	}
 }
 
@@ -35,6 +41,13 @@ func (e *Executor) Run() error {
 	if err == nil {
 		e.savedWorkingDir = wd
 	}
+
+	// Create logger
+	e.logger, err = logging.New(e.projectName, e.sshHost(), e.project.Remote.Commands)
+	if err != nil {
+		ui.Warning(fmt.Sprintf("Failed to create logger: %v", err))
+	}
+	e.startTime = time.Now()
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -54,11 +67,13 @@ func (e *Executor) Run() error {
 	select {
 	case res := <-resultCh:
 		signal.Stop(sigCh)
+		e.logResult(res.err)
 		return res.err
 	case sig := <-sigCh:
 		signal.Stop(sigCh)
 		ui.Error(fmt.Sprintf("Interrupted by %s", sig))
 		e.cleanup()
+		e.logResult(fmt.Errorf("interrupted by %s", sig))
 		return fmt.Errorf("interrupted by %s", sig)
 	}
 }
@@ -255,4 +270,38 @@ func (e *Executor) runAfter() error {
 // restoreWD restores the original working directory.
 func (e *Executor) restoreWD() {
 	restoreWorkingDir(e.savedWorkingDir)
+}
+
+// sshHost returns the SSH host for logging.
+func (e *Executor) sshHost() string {
+	host := e.project.SSH.Host
+	if host == "" {
+		host = e.project.SSH.Alias
+	}
+	return fmt.Sprintf("%s@%s", e.project.SSH.User, host)
+}
+
+// logResult writes the execution result to the log file.
+func (e *Executor) logResult(runErr error) {
+	if e.logger == nil {
+		return
+	}
+	duration := time.Since(e.startTime)
+	entry := logging.Entry{
+		Timestamp:   e.startTime.Format(time.RFC3339),
+		ProjectName: e.projectName,
+		UserHost:    e.sshHost(),
+		Commands:    e.project.Remote.Commands,
+		Success:    runErr == nil,
+		Duration:   duration.String(),
+	}
+	if runErr != nil {
+		entry.Error = runErr.Error()
+	}
+	if err := e.logger.Log(entry); err != nil {
+		fmt.Fprintf(os.Stderr, "[LOG] Warning: failed to write log: %v\n", err)
+	}
+	if err := e.logger.Close(); err != nil {
+		fmt.Fprintf(os.Stderr, "[LOG] Warning: failed to close log: %v\n", err)
+	}
 }

@@ -76,7 +76,7 @@ actually running any commands.`,
 		}
 
 		ui.Header(fmt.Sprintf("Running: %s", projectName))
-		exec := executor.New(project, verbose)
+		exec := executor.New(project, projectName, verbose)
 
 		if dryRun {
 			ui.SubHeader("Dry Run Mode")

@@ -28,6 +28,24 @@ orbit init
 orbit run my-project
 ```
 
+## Features
+
+### Upload Progress
+During file transfers, Orbit displays real-time progress:
+```
+Uploading myfile.tar.gz  45.2% [████████░░░░] 123.5/275.0 MiB  4.2 MiB/s
+```
+
+### SSH Retry
+If an SSH connection fails, Orbit automatically retries with exponential backoff (3 attempts: 1s, 2s, 4s delays).
+
+### Persistent Logging
+Every execution is logged to `~/.local/share/orbit/logs/` as JSON files:
+```json
+{"timestamp":"2026-05-07T14:32:01Z","project_name":"myproject","user_host":"admin@example.com","commands":["deploy.sh"],"success":true,"duration":"45.2s"}
+```
+Logs are rotated automatically, keeping the last 30 files.
+
 ## Installation
 
 Download a binary for your platform from the releases page, or use the install script:
@@ -132,6 +150,7 @@ Binaries go in the `build/` directory.
 - Don't commit config files with credentials to git
 - Use SSH keys instead of passwords when possible
 - Set restrictive permissions on your config: `chmod 600 ~/.config/orbit/config.yaml`
+- SSH host key verification is disabled (`ssh.InsecureIgnoreHostKey`) — use within trusted networks
 
 ## License
 

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.4] - 2026-05-07
+
+### Added
+- **Upload progress display** - Real-time progress bar with speed (bytes/sec), percentage, and ETA during file transfers
+- **SSH connection retry** - Automatic retry with exponential backoff (3 retries, 1s→2s→4s delay) on connection failure
+- **Persistent execution logging** - JSON logs stored in `~/.local/share/orbit/logs/` with timestamp, project, user@host, commands, success status, duration, and error details
+- Log rotation (keeps last 30 log files)
+
 ## [0.0.3] - 2026-05-06
 
 ### Added

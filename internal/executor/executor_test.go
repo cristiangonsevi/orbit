@@ -20,7 +20,7 @@ func TestExecutorNew(t *testing.T) {
 		},
 	}
 
-	exec := New(project, true)
+	exec := New(project, "test-project", true)
 	if exec == nil {
 		t.Error("New returned nil")
 	}
