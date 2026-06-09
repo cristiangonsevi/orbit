@@ -9,7 +9,8 @@ import (
 
 // runLocalCommands executes a series of commands locally.
 // If workingDir is set, commands are executed in that directory.
-// Commands run sequentially; if any fails, the rest are skipped.
+// All commands are joined with " && " and run in a single shell so that
+// environment variables (export) and directory changes (cd) persist across commands.
 func runLocalCommands(commands []string, workingDir string, verbose bool) error {
 	if len(commands) == 0 {
 		return nil
@@ -22,18 +23,20 @@ func runLocalCommands(commands []string, workingDir string, verbose bool) error 
 		}
 	}
 
-	for i, cmdStr := range commands {
-		if verbose {
-			fmt.Fprintf(os.Stderr, "[LOCAL] Running command %d/%d: %s\n", i+1, len(commands), cmdStr)
-		}
+	// Join all commands into a single shell invocation so exports and cd persist
+	combined := strings.Join(commands, " && ")
 
-		cmd := buildCommand(cmdStr)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+	if verbose {
+		fmt.Fprintf(os.Stderr, "[LOCAL] Running %d commands in single shell\n", len(commands))
+		fmt.Fprintf(os.Stderr, "[LOCAL] %s\n", combined)
+	}
 
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("local command %q failed: %w", cmdStr, err)
-		}
+	cmd := buildCommand(combined)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("local commands failed: %w", err)
 	}
 
 	return nil
